@@ -13,9 +13,9 @@ import numpy as np
 # File paths and titles
 file_paths = ['Book1.xlsx', 'Book2.xlsx', 'Book3.xlsx']
 titles = {
-    'Book1.xlsx': 'Wear Loss Prediction at 30N Load during Training',
-    'Book2.xlsx': 'Wear Loss Prediction at 20N Load during Training',
-    'Book3.xlsx': 'Wear Loss Prediction at 10N Load during Training'
+    'Book1.xlsx': 'Wear Loss Prediction at 30N Load during Training and Validation',
+    'Book2.xlsx': 'Wear Loss Prediction at 20N Load during Training and Validation',
+    'Book3.xlsx': 'Wear Loss Prediction at 10N Load during Training and Validation'
 }
 
 def plot_loss_curve(history, file_path, early_stopping_epoch, best_val_loss):
