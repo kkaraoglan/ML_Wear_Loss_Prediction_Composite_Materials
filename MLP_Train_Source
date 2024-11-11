@@ -1,11 +1,15 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
+from keras.models import Sequential
+from keras.layers import Dense, Dropout
+from keras.callbacks import EarlyStopping
+from keras.initializers import RandomUniform
+import numpy as np
 
-# File paths for the Excel data and corresponding titles for the graphs
+# File paths and titles
 file_paths = ['Book1.xlsx', 'Book2.xlsx', 'Book3.xlsx']
 titles = {
     'Book1.xlsx': 'Wear Loss Prediction at 30N Load during Training',
@@ -13,118 +17,95 @@ titles = {
     'Book3.xlsx': 'Wear Loss Prediction at 10N Load during Training'
 }
 
-
-def plot_loss_curve(mlp, early_stop_iteration, file_path, train_loss=None):
-    """
-    This function plots the loss curve for training data.
-    
-    Parameters:
-    - mlp: The trained MLPRegressor model.
-    - early_stop_iteration: The iteration where early stopping occurred.
-    - file_path: Path to the data file, used for labeling the graph.
-    - train_loss: The training loss values.
-    """
+def plot_loss_curve(history, file_path, early_stopping_epoch, best_val_loss):
+    """Plots the loss function curves for both training and validation losses"""
     plt.figure(figsize=(10, 6))
-    # Plot training loss
-    plt.plot(mlp.loss_curve_[:early_stop_iteration], color='#1f77b4', linewidth=3, marker='o', markersize=7,
-             label='Training Loss')
+    plt.plot(history.history['loss'], color='#1f77b4', linewidth=3, marker='o', markersize=7, label='Training Loss')
+    plt.plot(history.history['val_loss'], color='#ff7f0e', linewidth=3, marker='o', markersize=7, label='Validation Loss')
 
-    # Add a vertical line at the early stopping iteration
-    plt.axvline(x=early_stop_iteration, color='red', linestyle='--',
-                label=f'Early Stopping at Iteration {early_stop_iteration}')
-    
-    # Customize graph labels and title
+    # Highlight EarlyStopping best epoch
+    plt.axvline(x=early_stopping_epoch, color='green', linestyle='--', label=f'Early Stopping Epoch ({early_stopping_epoch})')
+
     plt.title(titles[file_path], fontsize=18, fontweight='bold', color='#333333', family='Arial')
-    plt.xlabel('Number of Iterations', fontsize=14, fontweight='bold', color='#333333', family='Arial')
+    plt.xlabel('Epochs', fontsize=14, fontweight='bold', color='#333333', family='Arial')
     plt.ylabel('Loss', fontsize=14, fontweight='bold', color='#333333', family='Arial')
     plt.grid(True, linestyle=':', color='gray', alpha=0.3)
-    plt.xlim(-1, early_stop_iteration)
     plt.legend()
-    
-    # Save the plot as a PNG file
     plt.savefig(f'loss_function_training_{file_path.split(".")[0]}.png', dpi=600, bbox_inches='tight')
     plt.show()
 
-
 def train_mlp_model(X_train, y_train, X_test, y_test):
-    """
-    This function defines, trains and returns the MLPRegressor model, and calculates the training loss.
-    
-    Parameters:
-    - X_train: The training feature data.
-    - y_train: The target data for training.
-    - X_test: The testing feature data.
-    - y_test: The target data for testing.
-    
-    Returns:
-    - mlp: The trained MLPRegressor model.
-    - early_stop_iteration: The iteration number where early stopping occurred.
-    - train_loss: The training loss value.
-    """
-    # Initialize and train the MLPRegressor model
-    mlp = MLPRegressor(
-        hidden_layer_sizes=(50, 50, 50, 50, 50),
-        activation='logistic',
-        solver='adam',
-        learning_rate_init=0.001,
-        max_iter=500,
-        random_state=42,
-        early_stopping=True,
-        n_iter_no_change=20,
-        verbose=True
-    )
-    mlp.fit(X_train, y_train)
+    """Defines and trains the MLP model with dropout for regularization"""
+    model = Sequential()
 
-    # Get the early stopping iteration number
-    early_stop_iteration = len(mlp.loss_curve_) - mlp.n_iter_no_change
+    # Hidden layers and Dropout
+    initializer = RandomUniform(minval=-0.05, maxval=0.05, seed=42)
+    model.add(Dense(10, input_dim=X_train.shape[1], activation='relu', kernel_initializer=initializer))  # First layer
+    model.add(Dropout(0.2))  # Dropout rate set to 20%
 
-    # Make predictions on the training data and compute training loss
-    train_predictions = mlp.predict(X_train)
+    # Adding 4 more hidden layers (each with 10 neurons)
+    for _ in range(4):
+        model.add(Dense(10, activation='relu', kernel_initializer=initializer))
+        model.add(Dropout(0.2))  # Dropout rate set to 20%
+
+    # Output layer
+    model.add(Dense(1))
+
+    # Compile the model
+    model.compile(optimizer='adam', loss='mean_squared_error')
+
+    # Early stopping callback
+    early_stopping = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
+
+    # Train the model
+    history = model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(X_test, y_test),
+                        callbacks=[early_stopping], verbose=0)
+
+    # Get the epoch where early stopping occurred and the best validation loss
+    early_stopping_epoch = np.argmin(history.history['val_loss'])
+    best_val_loss = np.min(history.history['val_loss'])
+
+    # Training predictions and loss
+    train_predictions = model.predict(X_train)
     train_loss = mean_squared_error(y_train, train_predictions)
 
-    # Return the model, early stopping iteration, and training loss
-    return mlp, early_stop_iteration, train_loss
-
+    return model, history, train_loss, early_stopping_epoch, best_val_loss
 
 def process_file(file_path):
-    """
-    This function processes each data file by loading, training the model, and plotting the loss curve.
-    
-    Parameters:
-    - file_path: The path to the Excel file containing the data.
-    """
+    """Processes each file by separating features and target, then trains the model"""
     try:
         # Read the Excel file
         data = pd.read_excel(file_path)
-        # Shuffle the data to ensure random splitting
+        # Shuffle the data
         data = data.sample(frac=1, random_state=42).reset_index(drop=True)
         print(f"Data for {file_path}:")
         print(data.head())
 
-        # Separate features (X) and target (y) from the data
-        X = data.iloc[:, :4]  # First 4 columns as features
-        y = data.iloc[:, -1]  # Last column as target
+        # Separate features and target variable
+        X = data.iloc[:, :4]
+        y = data.iloc[:, -1]
 
         # Split the data into training and testing sets
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # Scale the feature data
+        # Scale the features
         scaler = StandardScaler()
         X_train = scaler.fit_transform(X_train)
         X_test = scaler.transform(X_test)
 
-        # Train the model and get the loss information
-        mlp, early_stop_iteration, train_loss = train_mlp_model(X_train, y_train, X_test, y_test)
+        # Train the model and get the loss and early stopping details
+        model, history, train_loss, early_stopping_epoch, best_val_loss = train_mlp_model(X_train, y_train, X_test, y_test)
 
-        # Plot the loss curve for training data
-        plot_loss_curve(mlp, early_stop_iteration, file_path, train_loss)
+        # Plot the loss function curve with early stopping details
+        plot_loss_curve(history, file_path, early_stopping_epoch, best_val_loss)
 
-        # Print the training loss
-        print(f"Training Loss: {train_loss}")
+        # Output results
+        print(f"Model's training loss (Training Loss): {train_loss}")
+        print(f"Best validation loss: {best_val_loss} at epoch {early_stopping_epoch}")
 
     except Exception as e:
-        print(f"Error while processing {file_path}: {e}")
+        print(f"Error occurred while processing {file_path}: {e}")
 
-# Process each file in the list
+# Run the process for each file
 for file_path in file_paths:
     process_file(file_path)
