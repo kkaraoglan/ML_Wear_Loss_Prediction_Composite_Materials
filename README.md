@@ -21,6 +21,33 @@ The datasets used in this study will be made publicly available upon publication
 
 All code implementations utilized in this research will also be shared after the publication of the article.
 
+# Wear Loss Prediction Using MLP with Early Stopping
+
+This project demonstrates the use of a Multilayer Perceptron (MLP) neural network for predicting wear loss under different load conditions during training. It uses early stopping to prevent overfitting and to improve the model's generalization capabilities.
+
+## Project Overview
+This project aims to predict wear loss under three different load conditions (30N, 20N, and 10N) using machine learning techniques. The MLP model is built using Keras, with dropout layers for regularization and early stopping to halt training when the validation loss stops improving.
+
+### Key Features:
+- **MLP Architecture**: The model uses a feedforward neural network with five hidden layers.
+- **Early Stopping**: Training is halted when the validation loss does not improve after a specified number of epochs (patience).
+- **Dropout**: A dropout regularization technique is employed to prevent overfitting.
+
+## Installation
+
+To run this project, you will need the following Python libraries:
+
+- `pandas`
+- `scikit-learn`
+- `keras`
+- `matplotlib`
+- `numpy`
+
+You can install the required packages via pip:
+```bash
+pip install pandas scikit-learn keras matplotlib numpy
+
+
 ## Note
 
 This work is currently under review, and the datasets and all codes will be shared following the publication of the manuscript.
