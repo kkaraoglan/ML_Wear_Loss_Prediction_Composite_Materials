@@ -21,6 +21,33 @@ The datasets used in this study will be made publicly available upon publication
 
 All code implementations utilized in this research will also be shared after the publication of the article.
 
+## Project Owners and Contributors
+
+### Project Owners:
+- **Fatih Aydın**  
+  TOBB Vocational School of Technical Sciences, Karabuk University, Karabuk, Turkey  
+  Email: [fatih.aydin@karabuk.edu.tr](mailto:fatih.aydin@karabuk.edu.tr)
+
+### Contributors:
+- **Kürşat Mustafa Karaoğlan**  
+  Department of Computer Engineering, Karabuk University, Karabuk, Turkey
+
+- **Hatice Yakut Pektürk**  
+  Department of Mechanical Engineering, Kırklareli University, Kırklareli, Turkey
+
+- **Bilge Demir**  
+  Department of Mechanical Engineering, Karabuk University, Karabuk, Turkey
+
+- **Volkan Karakurt**  
+  Sağlam Metal San. ve Tic. A.Ş, Kocaeli, Turkey
+
+- **Hayrettin Ahlatçı**  
+  Department of Metallurgical and Materials Engineering, Karabuk University, Karabuk, Turkey
+
+### License:
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+
 # Wear Loss Prediction Using MLP with Early Stopping
 
 This project demonstrates the use of a Multilayer Perceptron (MLP) neural network for predicting wear loss under different load conditions during training. It uses early stopping to prevent overfitting and to improve the model's generalization capabilities.
