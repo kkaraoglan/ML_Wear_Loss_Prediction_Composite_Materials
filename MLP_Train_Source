@@ -1,12 +1,13 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
-from keras.models import Sequential
-from keras.layers import Dense, Dropout
-from keras.callbacks import EarlyStopping
-from keras.initializers import RandomUniform
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.initializers import RandomUniform
+from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
 import numpy as np
 
 # File paths and titles
@@ -34,42 +35,36 @@ def plot_loss_curve(history, file_path, early_stopping_epoch, best_val_loss):
     plt.savefig(f'loss_function_training_{file_path.split(".")[0]}.png', dpi=600, bbox_inches='tight')
     plt.show()
 
-def train_mlp_model(X_train, y_train, X_test, y_test):
-    """Defines and trains the MLP model with dropout for regularization"""
+def create_mlp_model(dropout_rate=0.2):
+    """Defines the MLP model with the specified dropout rate for regularization"""
     model = Sequential()
-
-    # Hidden layers and Dropout
     initializer = RandomUniform(minval=-0.05, maxval=0.05, seed=42)
-    model.add(Dense(10, input_dim=X_train.shape[1], activation='relu', kernel_initializer=initializer))  # First layer
-    model.add(Dropout(0.2))  # Dropout rate set to 20%
+    model.add(Dense(10, input_dim=4, activation='relu', kernel_initializer=initializer))
+    model.add(Dropout(dropout_rate))
 
-    # Adding 4 more hidden layers (each with 10 neurons)
-    for _ in range(4):
+    for _ in range(4):  # Adding additional hidden layers
         model.add(Dense(10, activation='relu', kernel_initializer=initializer))
-        model.add(Dropout(0.2))  # Dropout rate set to 20%
+        model.add(Dropout(dropout_rate))
 
-    # Output layer
-    model.add(Dense(1))
-
-    # Compile the model
+    model.add(Dense(1))  # Output layer
     model.compile(optimizer='adam', loss='mean_squared_error')
+    return model
 
-    # Early stopping callback
-    early_stopping = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
+def perform_grid_search(X_train, y_train):
+    """Performs GridSearchCV on the DMLP model"""
+    model = KerasRegressor(build_fn=create_mlp_model, epochs=100, batch_size=32, verbose=0)
 
-    # Train the model
-    history = model.fit(X_train, y_train, epochs=100, batch_size=32, validation_data=(X_test, y_test),
-                        callbacks=[early_stopping], verbose=0)
+    param_grid = {
+        'dropout_rate': [0.2, 0.3],
+        'epochs': [100, 150],
+        'batch_size': [32, 64]
+    }
 
-    # Get the epoch where early stopping occurred and the best validation loss
-    early_stopping_epoch = np.argmin(history.history['val_loss'])
-    best_val_loss = np.min(history.history['val_loss'])
-
-    # Training predictions and loss
-    train_predictions = model.predict(X_train)
-    train_loss = mean_squared_error(y_train, train_predictions)
-
-    return model, history, train_loss, early_stopping_epoch, best_val_loss
+    grid = GridSearchCV(estimator=model, param_grid=param_grid, cv=3, scoring='neg_mean_squared_error')
+    grid_result = grid.fit(X_train, y_train)
+    print("Best parameters found: ", grid_result.best_params_)
+    print("Best score (MSE): ", -grid_result.best_score_)
+    return grid_result.best_params_
 
 def process_file(file_path):
     """Processes each file by separating features and target, then trains the model"""
@@ -93,15 +88,22 @@ def process_file(file_path):
         X_train = scaler.fit_transform(X_train)
         X_test = scaler.transform(X_test)
 
-        # Train the model and get the loss and early stopping details
-        model, history, train_loss, early_stopping_epoch, best_val_loss = train_mlp_model(X_train, y_train, X_test, y_test)
+        # Perform Grid Search to get best hyperparameters
+        best_params = perform_grid_search(X_train, y_train)
 
-        # Plot the loss function curve with early stopping details
+        # Train final model with best parameters
+        model = create_mlp_model(dropout_rate=best_params['dropout_rate'])
+        early_stopping = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
+
+        history = model.fit(X_train, y_train, epochs=best_params['epochs'], batch_size=best_params['batch_size'], 
+                            validation_data=(X_test, y_test), callbacks=[early_stopping], verbose=0)
+
+        # Get best validation loss
+        early_stopping_epoch = np.argmin(history.history['val_loss'])
+        best_val_loss = np.min(history.history['val_loss'])
+
+        # Plot the loss function curve
         plot_loss_curve(history, file_path, early_stopping_epoch, best_val_loss)
-
-        # Output results
-        print(f"Model's training loss (Training Loss): {train_loss}")
-        print(f"Best validation loss: {best_val_loss} at epoch {early_stopping_epoch}")
 
     except Exception as e:
         print(f"Error occurred while processing {file_path}: {e}")
