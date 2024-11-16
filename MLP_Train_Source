@@ -51,7 +51,7 @@ def create_mlp_model(dropout_rate=0.2):
     return model
 
 def perform_grid_search(X_train, y_train):
-    """Performs GridSearchCV on the DMLP model"""
+    """Performs GridSearchCV on the MLP model"""
     model = KerasRegressor(build_fn=create_mlp_model, epochs=100, batch_size=32, verbose=0)
 
     param_grid = {
@@ -111,3 +111,5 @@ def process_file(file_path):
 # Run the process for each file
 for file_path in file_paths:
     process_file(file_path)
+
+# Detailed code explanations will be shared after the paper is accepted.
