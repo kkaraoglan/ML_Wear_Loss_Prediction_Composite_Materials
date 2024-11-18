@@ -1,0 +1,209 @@
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import (train_test_split, cross_val_score, 
+                                   GridSearchCV, KFold)
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.pipeline import Pipeline
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+warnings.filterwarnings('ignore')
+
+class RegressionModels:
+    def __init__(self):
+        self.models = {}
+        self.scores = {}
+        self.predictions = {}
+        self.cv_scores = {}
+        self.best_params = {}
+        self.scaler = StandardScaler()
+        
+    def read_excel_data(self, file_path):
+        """
+        Read excel file and prepare data
+        """
+        data = pd.read_excel(file_path)
+        X = data.iloc[:, :-1]  # All columns except the last one
+        y = data.iloc[:, -1]   # Last column as target
+        return X, y
+        
+    def prepare_data(self, X, y, test_size=0.2, random_state=42):
+        """
+        Prepare data and split into train/test sets
+        """
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+            X, y, test_size=test_size, random_state=random_state
+        )
+        
+        # Scale the features
+        self.X_train_scaled = self.scaler.fit_transform(self.X_train)
+        self.X_test_scaled = self.scaler.transform(self.X_test)
+        
+        # Store feature names
+        self.feature_names = X.columns
+        
+    def process_all_datasets(self, file_paths, titles):
+        """
+        Process all datasets and store results
+        """
+        all_results = {}
+        
+        for file_path in file_paths:
+            print(f"\nProcessing dataset: {titles[file_path]}")
+            print("=" * 80)
+            
+            # Read and prepare data
+            X, y = self.read_excel_data(file_path)
+            self.prepare_data(X, y)
+            
+            # Train all models
+            self.train_all_models()
+            
+            # Store results
+            all_results[file_path] = {
+                'scores': self.scores.copy(),
+                'cv_scores': self.cv_scores.copy(),
+                'best_params': self.best_params.copy(),
+                'predictions': self.predictions.copy(),
+                'feature_importance': self.get_feature_importance()
+            }
+            
+            # Plot results
+            self.plot_results(title=titles[file_path])
+            
+            # Print metrics
+            self.print_metrics(title=titles[file_path])
+            
+        return all_results
+
+    def get_feature_importance(self):
+        """
+        Get feature importance from tree-based models
+        """
+        importance_dict = {}
+        
+        if 'RandomForest' in self.models:
+            rf_importance = pd.Series(
+                self.models['RandomForest'].feature_importances_,
+                index=self.feature_names
+            )
+            importance_dict['RandomForest'] = rf_importance
+            
+        if 'GradientBoosting' in self.models:
+            gb_importance = pd.Series(
+                self.models['GradientBoosting'].feature_importances_,
+                index=self.feature_names
+            )
+            importance_dict['GradientBoosting'] = gb_importance
+            
+        return importance_dict
+
+    # [Previous methods remain the same: perform_cross_validation, optimize_hyperparameters, 
+    # train_linear_regression, train_polynomial_regression, train_random_forest, 
+    # train_gradient_boosting, evaluate_model, train_all_models]
+
+    def plot_results(self, title="Model Performance Comparison"):
+        """
+        Visualize model results with custom title
+        """
+        plt.style.use('seaborn')
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 6))
+        
+        # 1. Test vs Train R2 Scores
+        models = list(self.scores.keys())
+        train_r2 = [self.scores[model]['train_r2'] for model in models]
+        test_r2 = [self.scores[model]['test_r2'] for model in models]
+        
+        x = np.arange(len(models))
+        width = 0.35
+        
+        ax1.bar(x - width/2, train_r2, width, label='Train R2', color='skyblue')
+        ax1.bar(x + width/2, test_r2, width, label='Test R2', color='lightcoral')
+        ax1.set_xlabel('Models')
+        ax1.set_ylabel('R2 Score')
+        ax1.set_title('Train vs Test R2 Scores')
+        ax1.set_xticks(x)
+        ax1.set_xticklabels(models, rotation=45)
+        ax1.legend()
+        
+        # 2. Cross-validation R2 Scores
+        cv_r2_means = [self.cv_scores[model]['r2_mean'] for model in models]
+        cv_r2_stds = [self.cv_scores[model]['r2_std'] for model in models]
+        
+        ax2.bar(models, cv_r2_means, yerr=cv_r2_stds, capsize=5, color='lightgreen')
+        ax2.set_xlabel('Models')
+        ax2.set_ylabel('Cross-validation R2 Score')
+        ax2.set_title('Cross-validation Results')
+        ax2.set_xticklabels(models, rotation=45)
+        
+        # 3. Feature Importance
+        importance_dict = self.get_feature_importance()
+        if importance_dict:
+            # Use Random Forest importance by default
+            importance = importance_dict['RandomForest']
+            importance.sort_values(ascending=True, inplace=True)
+            
+            ax3.barh(range(len(importance)), importance.values, color='lightblue')
+            ax3.set_yticks(range(len(importance)))
+            ax3.set_yticklabels(importance.index)
+            ax3.set_xlabel('Feature Importance')
+            ax3.set_title('Random Forest Feature Importance')
+        
+        plt.suptitle(title, fontsize=14, y=1.05)
+        plt.tight_layout()
+        plt.show()
+        
+    def print_metrics(self, title="Model Performance Metrics"):
+        """
+        Print metrics for all models with custom title
+        """
+        print(f"\n{title}")
+        print("=" * 80)
+        
+        for model_name in self.scores.keys():
+            print(f"\n{model_name} Results:")
+            print("-" * 50)
+            
+            # Main metrics
+            scores = self.scores[model_name]
+            print(f"Train RMSE: {scores['train_rmse']:.4f}")
+            print(f"Test RMSE: {scores['test_rmse']:.4f}")
+            print(f"Train R2: {scores['train_r2']:.4f}")
+            print(f"Test R2: {scores['test_r2']:.4f}")
+            
+            # Cross-validation results
+            cv_scores = self.cv_scores[model_name]
+            print(f"\nCross-validation Results:")
+            print(f"Mean R2: {cv_scores['r2_mean']:.4f} (±{cv_scores['r2_std']:.4f})")
+            print(f"Mean RMSE: {cv_scores['rmse_mean']:.4f} (±{cv_scores['rmse_std']:.4f})")
+            
+            # Best parameters (except Linear)
+            if model_name in self.best_params:
+                print(f"\nBest Parameters:")
+                for param, value in self.best_params[model_name].items():
+                    print(f"{param}: {value}")
+
+# Example Usage
+"""
+# File paths and titles
+file_paths = ['Book1.xlsx', 'Book2.xlsx', 'Book3.xlsx']
+titles = {
+    'Book1.xlsx': 'Wear Loss Prediction at 30N Load during Training and Validation',
+    'Book2.xlsx': 'Wear Loss Prediction at 20N Load during Training and Validation',
+    'Book3.xlsx': 'Wear Loss Prediction at 10N Load during Training and Validation'
+}
+
+# Create model instance
+regressor = RegressionModels()
+
+# Process all datasets
+all_results = regressor.process_all_datasets(file_paths, titles)
+
+# Access results for specific dataset
+results_30N = all_results['Book1.xlsx']
+results_20N = all_results['Book2.xlsx']
+results_10N = all_results['Book3.xlsx']
+"""
