@@ -1,5 +1,5 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import train_test_split, GridSearchCV, KFold
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
@@ -10,7 +10,7 @@ from tensorflow.keras.initializers import RandomUniform
 from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
 import numpy as np
 
-# File paths and titles
+# Define experimental configurations
 file_paths = ['Book1.xlsx', 'Book2.xlsx', 'Book3.xlsx']
 titles = {
     'Book1.xlsx': 'Wear Loss Prediction at 30N Load during Training and Validation',
@@ -19,14 +19,15 @@ titles = {
 }
 
 def plot_loss_curve(history, file_path, early_stopping_epoch, best_val_loss):
-    """Plots the loss function curves for both training and validation losses"""
+    """Visualize training and validation loss curves with early stopping point"""
     plt.figure(figsize=(10, 6))
-    plt.plot(history.history['loss'], color='#1f77b4', linewidth=3, marker='o', markersize=7, label='Training Loss')
-    plt.plot(history.history['val_loss'], color='#ff7f0e', linewidth=3, marker='o', markersize=7, label='Validation Loss')
-
-    # Highlight EarlyStopping best epoch
-    plt.axvline(x=early_stopping_epoch, color='green', linestyle='--', label=f'Early Stopping Epoch ({early_stopping_epoch})')
-
+    plt.plot(history.history['loss'], color='#1f77b4', linewidth=3, marker='o', 
+             markersize=7, label='Training Loss')
+    plt.plot(history.history['val_loss'], color='#ff7f0e', linewidth=3, marker='o', 
+             markersize=7, label='Validation Loss')
+    plt.axvline(x=early_stopping_epoch, color='green', linestyle='--', 
+                label=f'Early Stopping Epoch ({early_stopping_epoch})')
+    
     plt.title(titles[file_path], fontsize=18, fontweight='bold', color='#333333', family='Arial')
     plt.xlabel('Epochs', fontsize=14, fontweight='bold', color='#333333', family='Arial')
     plt.ylabel('Loss', fontsize=14, fontweight='bold', color='#333333', family='Arial')
@@ -35,81 +36,90 @@ def plot_loss_curve(history, file_path, early_stopping_epoch, best_val_loss):
     plt.savefig(f'loss_function_training_{file_path.split(".")[0]}.png', dpi=600, bbox_inches='tight')
     plt.show()
 
-def create_mlp_model(dropout_rate=0.2):
-    """Defines the MLP model with the specified dropout rate for regularization"""
+def create_mlp_model(dropout_rate=0.2, learning_rate='adam'):
+    """Initialize MLP architecture with specified hyperparameters"""
     model = Sequential()
     initializer = RandomUniform(minval=-0.05, maxval=0.05, seed=42)
+    
+    # Input layer configuration
     model.add(Dense(10, input_dim=4, activation='relu', kernel_initializer=initializer))
     model.add(Dropout(dropout_rate))
-
-    for _ in range(4):  # Adding additional hidden layers
+    
+    # Hidden layers implementation
+    for _ in range(5):
         model.add(Dense(10, activation='relu', kernel_initializer=initializer))
         model.add(Dropout(dropout_rate))
-
-    model.add(Dense(1))  # Output layer
-    model.compile(optimizer='adam', loss='mean_squared_error')
+    
+    # Output layer configuration
+    model.add(Dense(1))
+    model.compile(optimizer=learning_rate, loss='mean_squared_error')
     return model
 
-def perform_grid_search(X_train, y_train):
-    """Performs GridSearchCV on the MLP model"""
+def perform_cv_and_grid_search(X, y, n_splits=5):
+    """Execute k-fold cross-validation with grid search optimization"""
+    kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
     model = KerasRegressor(build_fn=create_mlp_model, epochs=100, batch_size=32, verbose=0)
-
+    
     param_grid = {
-        'dropout_rate': [0.2, 0.3],
-        'epochs': [100, 150],
-        'batch_size': [32, 64]
+        'dropout_rate': [0.2],
+        'epochs': [100],
+        'batch_size': [32]
     }
-
-    grid = GridSearchCV(estimator=model, param_grid=param_grid, cv=3, scoring='neg_mean_squared_error')
-    grid_result = grid.fit(X_train, y_train)
-    print("Best parameters found: ", grid_result.best_params_)
-    print("Best score (MSE): ", -grid_result.best_score_)
-    return grid_result.best_params_
+    
+    grid = GridSearchCV(estimator=model, param_grid=param_grid, cv=kfold, 
+                       scoring='neg_mean_squared_error')
+    grid_result = grid.fit(X, y)
+    
+    print("\nCross-validation metrics:")
+    for mean, std, params in zip(grid_result.cv_results_['mean_test_score'], 
+                               grid_result.cv_results_['std_test_score'],
+                               grid_result.cv_results_['params']):
+        print(f"MSE: {-mean:.4f} (±{std * 2:.4f}) with parameters: {params}")
+    
+    print(f"\nOptimal parameters: {grid_result.best_params_}")
+    print(f"Best MSE: {-grid_result.best_score_:.4f}")
+    
+    return grid_result.best_params_, grid_result.best_estimator_
 
 def process_file(file_path):
-    """Processes each file by separating features and target, then trains the model"""
+    """Process individual experimental datasets"""
     try:
-        # Read the Excel file
+        # Data preprocessing
         data = pd.read_excel(file_path)
-        # Shuffle the data
         data = data.sample(frac=1, random_state=42).reset_index(drop=True)
-        print(f"Data for {file_path}:")
+        print(f"\nDataset summary for {file_path}:")
         print(data.head())
 
-        # Separate features and target variable
+        # Feature extraction and scaling
         X = data.iloc[:, :4]
         y = data.iloc[:, -1]
-
-        # Split the data into training and testing sets
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-        # Scale the features
         scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_train)
-        X_test = scaler.transform(X_test)
+        X_scaled = scaler.fit_transform(X)
 
-        # Perform Grid Search to get best hyperparameters
-        best_params = perform_grid_search(X_train, y_train)
-
-        # Train final model with best parameters
+        # Model optimization and training
+        best_params, best_model = perform_cv_and_grid_search(X_scaled, y)
+        X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, 
+                                                           test_size=0.2, 
+                                                           random_state=42)
+        
+        # Final model training with optimized parameters
         model = create_mlp_model(dropout_rate=best_params['dropout_rate'])
-        early_stopping = EarlyStopping(monitor='val_loss', patience=20, restore_best_weights=True)
+        early_stopping = EarlyStopping(monitor='val_loss', patience=20, 
+                                     restore_best_weights=True)
+        
+        history = model.fit(X_train, y_train, epochs=best_params['epochs'],
+                          batch_size=best_params['batch_size'],
+                          validation_data=(X_test, y_test),
+                          callbacks=[early_stopping], verbose=0)
 
-        history = model.fit(X_train, y_train, epochs=best_params['epochs'], batch_size=best_params['batch_size'], 
-                            validation_data=(X_test, y_test), callbacks=[early_stopping], verbose=0)
-
-        # Get best validation loss
+        # Performance visualization
         early_stopping_epoch = np.argmin(history.history['val_loss'])
         best_val_loss = np.min(history.history['val_loss'])
-
-        # Plot the loss function curve
         plot_loss_curve(history, file_path, early_stopping_epoch, best_val_loss)
 
     except Exception as e:
-        print(f"Error occurred while processing {file_path}: {e}")
+        print(f"Error in processing {file_path}: {e}")
 
-# Run the process for each file
+# Execute experimental pipeline
 for file_path in file_paths:
     process_file(file_path)
-
-# Detailed code explanations will be shared after the paper is accepted.
