@@ -10,6 +10,8 @@ import matplotlib
 
 matplotlib.use('Agg')
 
+
+# [RPropMLPEstimator sınıfı aynı kalacak...]
 class RPropMLPEstimator(BaseEstimator, RegressorMixin):
     """sklearn uyumlu RPropMLP sınıfı"""
 
@@ -491,9 +493,9 @@ def process_dataset_with_gridsearch(file_name, target_column):
         # Genişletilmiş parametre grid - CV değeri eklendi
         param_grid = {
             'n_hidden_layers': [3, 5, 7, 10],
-            'n_neurons': [8, 10, 12, 15],
+            'n_neurons': [8, 10, 12],
             'max_iter': [100, 150, 200],
-            'patience': [5, 10, 15, 20],
+            'patience': [5, 10, 15, 20, 25],
             'cv': [3, 5]  # CV değerleri eklendi
         }
 
@@ -574,6 +576,45 @@ def process_dataset_with_gridsearch(file_name, target_column):
         }
 
         # Excel dosyası işlemleri ve grafik oluşturma aynı şekilde devam eder...
+        # Sonuçları DataFrame'lere kaydet
+        train_results = pd.DataFrame({
+            'Set': ['Train'] * len(y_train_true),
+            'Actual_Values': y_train_true.ravel(),
+            'Predicted_Values': y_train_pred.ravel()
+        })
+
+        test_results = pd.DataFrame({
+            'Set': ['Test'] * len(y_test_true),
+            'Actual_Values': y_test_true.ravel(),
+            'Predicted_Values': y_test_pred.ravel()
+        })
+
+        # Tüm sonuçları birleştir
+        all_results = pd.concat([train_results, test_results], ignore_index=True)
+
+        # Sonuçları Excel'e kaydet
+        safe_target = target_column.replace(" ", "_").replace("(", "").replace(")", "")
+        results_filename = f'prediction_results_{safe_target}.xlsx'
+        # Excel kaydetme kısmından sonra ve return'den önce şu şekilde değiştirin:
+        try:
+            with pd.ExcelWriter(results_filename) as writer:
+                train_results.to_excel(writer, sheet_name='Training Results', index=False)
+                test_results.to_excel(writer, sheet_name='Test Results', index=False)
+                all_results.to_excel(writer, sheet_name='All Results', index=False)
+
+                # CV sonuçlarını da kaydet
+                cv_results = pd.DataFrame(grid_search.cv_results_)
+                cv_results.to_excel(writer, sheet_name='CV Results', index=False)
+        except Exception as e:
+            print(f"Warning: Could not save to Excel: {str(e)}")
+
+        # Yeni grafik fonksiyonunu çağır
+        create_publication_quality_plots(
+            best_model=best_model,
+            target_column=target_column,
+            metrics=metrics,
+            early_stopping_epoch=early_stopping_epoch
+        )
 
         return metrics, best_params
 
