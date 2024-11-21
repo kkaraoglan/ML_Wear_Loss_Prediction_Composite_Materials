@@ -494,7 +494,7 @@ def process_dataset_with_gridsearch(file_name, target_column):
             'n_neurons': [8, 10, 12],
             'max_iter': [100, 150, 200],
             'patience': [5, 10, 15, 20, 25],
-            'cv': [3, 5]  # CV değerleri eklendi
+            'cv': [3, 5, 7]  # CV değerleri eklendi
         }
 
         print("\nGrid Search Parameters:")
