@@ -10,8 +10,6 @@ import matplotlib
 
 matplotlib.use('Agg')
 
-
-# [RPropMLPEstimator sınıfı aynı kalacak...]
 class RPropMLPEstimator(BaseEstimator, RegressorMixin):
     """sklearn uyumlu RPropMLP sınıfı"""
 
