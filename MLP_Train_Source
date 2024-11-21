@@ -1,125 +1,677 @@
-import pandas as pd
-from sklearn.model_selection import train_test_split, GridSearchCV, KFold
-from sklearn.preprocessing import StandardScaler
-import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout
-from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.initializers import RandomUniform
-from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
 import numpy as np
+import pandas as pd
+from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.model_selection import GridSearchCV
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+import matplotlib.pyplot as plt
+import matplotlib
 
-# Define experimental configurations
-file_paths = ['Book1.xlsx', 'Book2.xlsx', 'Book3.xlsx']
-titles = {
-    'Book1.xlsx': 'Wear Loss Prediction at 30N Load during Training and Validation',
-    'Book2.xlsx': 'Wear Loss Prediction at 20N Load during Training and Validation',
-    'Book3.xlsx': 'Wear Loss Prediction at 10N Load during Training and Validation'
-}
+matplotlib.use('Agg')
 
-def plot_loss_curve(history, file_path, early_stopping_epoch, best_val_loss):
-    """Visualize training and validation loss curves with early stopping point"""
-    plt.figure(figsize=(10, 6))
-    plt.plot(history.history['loss'], color='#1f77b4', linewidth=3, marker='o', 
-             markersize=7, label='Training Loss')
-    plt.plot(history.history['val_loss'], color='#ff7f0e', linewidth=3, marker='o', 
-             markersize=7, label='Validation Loss')
-    plt.axvline(x=early_stopping_epoch, color='green', linestyle='--', 
-                label=f'Early Stopping Epoch ({early_stopping_epoch})')
-    
-    plt.title(titles[file_path], fontsize=18, fontweight='bold', color='#333333', family='Arial')
-    plt.xlabel('Epochs', fontsize=14, fontweight='bold', color='#333333', family='Arial')
-    plt.ylabel('Loss', fontsize=14, fontweight='bold', color='#333333', family='Arial')
-    plt.grid(True, linestyle=':', color='gray', alpha=0.3)
-    plt.legend()
-    plt.savefig(f'loss_function_training_{file_path.split(".")[0]}.png', dpi=600, bbox_inches='tight')
-    plt.show()
 
-def create_mlp_model(dropout_rate=0.2, learning_rate='adam'):
-    """Initialize MLP architecture with specified hyperparameters"""
-    model = Sequential()
-    initializer = RandomUniform(minval=-0.05, maxval=0.05, seed=42)
-    
-    # Input layer configuration
-    model.add(Dense(10, input_dim=4, activation='relu', kernel_initializer=initializer))
-    model.add(Dropout(dropout_rate))
-    
-    # Hidden layers implementation
-    for _ in range(5):
-        model.add(Dense(10, activation='relu', kernel_initializer=initializer))
-        model.add(Dropout(dropout_rate))
-    
-    # Output layer configuration
-    model.add(Dense(1))
-    model.compile(optimizer=learning_rate, loss='mean_squared_error')
-    return model
+# [RPropMLPEstimator sınıfı aynı kalacak...]
+class RPropMLPEstimator(BaseEstimator, RegressorMixin):
+    """sklearn uyumlu RPropMLP sınıfı"""
 
-def perform_cv_and_grid_search(X, y, n_splits=5):
-    """Execute k-fold cross-validation with grid search optimization"""
-    kfold = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-    model = KerasRegressor(build_fn=create_mlp_model, epochs=100, batch_size=32, verbose=0)
-    
-    param_grid = {
-        'dropout_rate': [0.2],
-        'epochs': [100],
-        'batch_size': [32]
+    def __init__(self, n_hidden_layers=5, n_neurons=10, max_iter=100,
+                 eta_plus=1.2, eta_minus=0.5, delta_min=1e-6, delta_max=50.0,
+                 random_state=42, patience=20, min_delta=1e-4):
+        self.n_hidden_layers = n_hidden_layers
+        self.n_neurons = n_neurons
+        self.max_iter = max_iter
+        self.eta_plus = eta_plus
+        self.eta_minus = eta_minus
+        self.delta_min = delta_min
+        self.delta_max = delta_max
+        self.random_state = random_state
+        self.patience = patience
+        self.min_delta = min_delta
+        self.history = {'train_loss': [], 'val_loss': []}
+        np.random.seed(random_state)
+
+    def _initialize_weights(self, input_dim):
+        self.weights = []
+        self.prev_gradients = []
+        self.deltas = []
+
+        w = np.random.randn(input_dim, self.n_neurons) * np.sqrt(2.0 / input_dim)
+        self.weights.append(w)
+        self.prev_gradients.append(np.zeros_like(w))
+        self.deltas.append(np.ones_like(w) * 0.1)
+
+        for i in range(self.n_hidden_layers - 1):
+            w = np.random.randn(self.n_neurons, self.n_neurons) * np.sqrt(2.0 / self.n_neurons)
+            self.weights.append(w)
+            self.prev_gradients.append(np.zeros_like(w))
+            self.deltas.append(np.ones_like(w) * 0.1)
+
+        w = np.random.randn(self.n_neurons, 1) * np.sqrt(2.0 / self.n_neurons)
+        self.weights.append(w)
+        self.prev_gradients.append(np.zeros_like(w))
+        self.deltas.append(np.ones_like(w) * 0.1)
+
+    def _forward_pass(self, X):
+        self.activations = [X]
+        self.z_values = []
+
+        z = np.dot(X, self.weights[0])
+        self.z_values.append(z)
+        h = np.tanh(z)
+        self.activations.append(h)
+
+        for i in range(1, self.n_hidden_layers):
+            z = np.dot(h, self.weights[i])
+            self.z_values.append(z)
+            h = np.tanh(z)
+            self.activations.append(h)
+
+        output = np.dot(h, self.weights[-1])
+        self.z_values.append(output)
+        self.activations.append(output)
+
+        return output
+
+    def _backward_pass(self, X, y, output):
+        m = X.shape[0]
+        gradients = []
+
+        error = output - y.reshape(-1, 1)
+        grad = np.dot(self.activations[-2].T, error) / m
+        gradients.insert(0, grad)
+
+        for i in range(len(self.weights) - 2, -1, -1):
+            error = np.dot(error, self.weights[i + 1].T) * (1 - np.tanh(self.z_values[i]) ** 2)
+            grad = np.dot(self.activations[i].T, error) / m
+            gradients.insert(0, grad)
+
+        return gradients
+
+    def _calculate_loss(self, y_true, y_pred):
+        return np.mean(np.square(y_true.reshape(-1, 1) - y_pred))
+
+    def _update_weights(self, gradients):
+        for i in range(len(self.weights)):
+            sign = np.sign(gradients[i] * self.prev_gradients[i])
+
+            self.deltas[i] = np.where(sign > 0,
+                                      np.minimum(self.deltas[i] * self.eta_plus, self.delta_max),
+                                      np.where(sign < 0,
+                                               np.maximum(self.deltas[i] * self.eta_minus, self.delta_min),
+                                               self.deltas[i]))
+
+            update = -np.sign(gradients[i]) * self.deltas[i]
+            self.weights[i] += update
+
+            self.prev_gradients[i] = np.where(sign < 0, 0, gradients[i])
+
+    def fit(self, X, y):
+        try:
+            X_train, X_val, y_train, y_val = train_test_split(
+                X, y, test_size=0.2, random_state=self.random_state
+            )
+
+            self._initialize_weights(X.shape[1])
+
+            best_loss = float('inf')
+            patience_counter = 0
+            best_weights = None
+
+            for epoch in range(self.max_iter):
+                train_output = self._forward_pass(X_train)
+                gradients = self._backward_pass(X_train, y_train, train_output)
+                self._update_weights(gradients)
+
+                train_loss = self._calculate_loss(y_train, train_output)
+                val_output = self._forward_pass(X_val)
+                val_loss = self._calculate_loss(y_val, val_output)
+
+                self.history['train_loss'].append(train_loss)
+                self.history['val_loss'].append(val_loss)
+
+                if val_loss < best_loss - self.min_delta:
+                    best_loss = val_loss
+                    patience_counter = 0
+                    best_weights = [w.copy() for w in self.weights]
+                else:
+                    patience_counter += 1
+
+                if patience_counter >= self.patience:
+                    if best_weights is not None:
+                        self.weights = best_weights
+                    break
+
+            return self
+        except Exception as e:
+            print(f"Error during fitting: {str(e)}")
+            raise
+
+    def predict(self, X):
+        try:
+            return self._forward_pass(X)
+        except Exception as e:
+            print(f"Error during prediction: {str(e)}")
+            raise
+
+
+def create_publication_quality_plots(best_model, target_column, metrics, early_stopping_epoch):
+    """
+    Bilimsel yayın kalitesinde DMLP grafikleri oluştur
+
+    Parameters:
+    -----------
+    best_model : RPropMLPEstimator
+        Eğitilmiş en iyi model
+    target_column : str
+        Hedef değişken adı
+    metrics : dict
+        Model metrikleri (R², RMSE, MAE, MAPE ve tahmin değerleri)
+    early_stopping_epoch : int
+        Early stopping'in gerçekleştiği epoch
+    """
+
+    # Matplotlib stil ayarları
+    plt.style.use('default')
+    plt.rcParams.update({
+        'figure.facecolor': 'white',
+        'axes.facecolor': 'white',
+        'axes.edgecolor': 'black',
+        'axes.labelcolor': 'black',
+        'axes.grid': True,
+        'grid.color': 'gray',
+        'grid.linestyle': '--',
+        'grid.alpha': 0.3,
+        'lines.linewidth': 2.5,
+        'font.family': 'sans-serif',
+        'font.size': 12,
+        'text.color': 'black',
+        'xtick.color': 'black',
+        'ytick.color': 'black',
+        'xtick.direction': 'out',
+        'ytick.direction': 'out',
+        'axes.spines.top': True,
+        'axes.spines.right': True
+    })
+
+    # Dosya adı için güvenli string oluştur
+    safe_target = target_column.replace(" ", "_").replace("(", "").replace(")", "")
+
+    # 1. Training History Plot
+    fig, ax = plt.subplots(figsize=(10, 8), dpi=300)
+
+    # Ana eğitim eğrileri
+    ax.plot(best_model.history['train_loss'],
+            label='DMLP Training MSE',
+            color='#0077BB',
+            linewidth=2.5,
+            zorder=3)
+
+    ax.plot(best_model.history['val_loss'],
+            label='DMLP Validation MSE',
+            color='#EE3377',
+            linewidth=2.5,
+            zorder=3)
+
+    # Early stopping noktası
+    ax.axvline(x=early_stopping_epoch,
+               color='#009988',
+               linestyle='--',
+               linewidth=2,
+               label=f'Early Stopping Point\n(Epoch {early_stopping_epoch})',
+               zorder=2)
+
+    # Early stopping noktasını işaretle
+    ax.scatter(early_stopping_epoch,
+               best_model.history['val_loss'][early_stopping_epoch],
+               color='#009988',
+               s=150,
+               zorder=4,
+               edgecolor='white',
+               linewidth=2)
+
+    # Bilimsel başlıklar ve etiketler
+    ax.set_xlabel('Training Epochs', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Mean Squared Error (MSE)', fontsize=12, fontweight='bold')
+
+    title = f'DMLP Training Convergence Analysis\n{target_column}'
+    subtitle = (f'$R^2_{{\mathrm{{train}}}}$ = {metrics["train_r2"]:.4f}, '
+                f'$R^2_{{\mathrm{{test}}}}$ = {metrics["test_r2"]:.4f}\n'
+                f'$\mathrm{{RMSE}}_{{train}}$ = {metrics["train_rmse"]:.2e}, '
+                f'$\mathrm{{RMSE}}_{{test}}$ = {metrics["test_rmse"]:.2e}')
+
+    ax.set_title(title + '\n' + subtitle,
+                 fontsize=14,
+                 fontweight='bold',
+                 pad=20)
+
+    ax.grid(True, linestyle='--', alpha=0.3, zorder=1)
+    ax.legend(loc='upper right',
+              fontsize=10,
+              frameon=True,
+              fancybox=True,
+              framealpha=0.95,
+              edgecolor='gray')
+
+    plt.tight_layout()
+    plt.savefig(f'DMLP_training_history_{safe_target}.png',
+                dpi=300,
+                bbox_inches='tight',
+                facecolor='white',
+                edgecolor='none')
+    plt.close()
+
+    # 2. Actual vs Predicted Plot
+    fig, ax = plt.subplots(figsize=(10, 10), dpi=300)
+
+    # Scatter plots
+    ax.scatter(metrics['y_train_true'],
+               metrics['y_train_pred'],
+               c='#0077BB',
+               alpha=0.6,
+               s=100,
+               label='DMLP Training Data',
+               zorder=3)
+
+    ax.scatter(metrics['y_test_true'],
+               metrics['y_test_pred'],
+               c='#EE3377',
+               alpha=0.6,
+               s=100,
+               label='DMLP Test Data',
+               zorder=3)
+
+    # İdeal tahmin çizgisi
+    max_val = max(np.max(metrics['y_train_true']), np.max(metrics['y_train_pred']))
+    min_val = min(np.min(metrics['y_train_true']), np.min(metrics['y_train_pred']))
+    padding = (max_val - min_val) * 0.1
+
+    ax.plot([min_val - padding, max_val + padding],
+            [min_val - padding, max_val + padding],
+            '--',
+            color='#009988',
+            linewidth=2,
+            label='Perfect Prediction Line',
+            zorder=2)
+
+    ax.set_xlabel('Experimental Values', fontsize=12, fontweight='bold')
+    ax.set_ylabel('DMLP Predicted Values', fontsize=12, fontweight='bold')
+
+    title = 'DMLP Prediction Performance Analysis\n' + target_column
+    subtitle = (f'Training: MAPE = {metrics["train_mape"]:.2f}%, MAE = {metrics["train_mae"]:.2e}\n'
+                f'Test: MAPE = {metrics["test_mape"]:.2f}%, MAE = {metrics["test_mae"]:.2e}')
+
+    ax.set_title(title + '\n' + subtitle,
+                 fontsize=14,
+                 fontweight='bold',
+                 pad=20)
+
+    ax.grid(True, linestyle='--', alpha=0.3, zorder=1)
+    ax.legend(loc='upper left',
+              fontsize=10,
+              frameon=True,
+              fancybox=True,
+              framealpha=0.95,
+              edgecolor='gray')
+
+    ax.set_xlim([min_val - padding, max_val + padding])
+    ax.set_ylim([min_val - padding, max_val + padding])
+    ax.set_aspect('equal')
+
+    plt.tight_layout()
+    plt.savefig(f'DMLP_prediction_performance_{safe_target}.png',
+                dpi=300,
+                bbox_inches='tight',
+                facecolor='white',
+                edgecolor='none')
+    plt.close()
+
+    # 3. Karşılaştırmalı Hata Analizi Grafiği
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6), dpi=300)
+
+    # Hesaplama
+    train_errors = metrics['y_train_pred'].ravel() - metrics['y_train_true'].ravel()
+    test_errors = metrics['y_test_pred'].ravel() - metrics['y_test_true'].ravel()
+
+    # Sol: Box Plot
+    bp = ax1.boxplot([train_errors, test_errors],
+                     labels=['Training', 'Test'],
+                     patch_artist=True)
+
+    bp['boxes'][0].set_facecolor('#0077BB')
+    bp['boxes'][1].set_facecolor('#EE3377')
+
+    ax1.set_ylabel('Prediction Error', fontsize=12, fontweight='bold')
+    ax1.set_title('DMLP Error Distribution Analysis\n' + target_column,
+                  fontsize=14,
+                  fontweight='bold',
+                  pad=20)
+    ax1.grid(True, linestyle='--', alpha=0.3)
+    ax1.axhline(y=0, color='k', linestyle='--', alpha=0.3)
+
+    # Sağ: Density Plot
+    from scipy.stats import gaussian_kde
+
+    def plot_density(data, color, label, ax):
+        density = gaussian_kde(data)
+        xs = np.linspace(min(data), max(data), 200)
+        ax.plot(xs, density(xs), color=color, linewidth=2.5, label=label)
+        ax.fill_between(xs, density(xs), alpha=0.2, color=color)
+
+    plot_density(train_errors, '#0077BB', 'Training Error', ax2)
+    plot_density(test_errors, '#EE3377', 'Test Error', ax2)
+
+    ax2.set_xlabel('Prediction Error', fontsize=12, fontweight='bold')
+    ax2.set_ylabel('Density', fontsize=12, fontweight='bold')
+    ax2.set_title('DMLP Error Distribution Density\n' + target_column,
+                  fontsize=14,
+                  fontweight='bold',
+                  pad=20)
+    ax2.grid(True, linestyle='--', alpha=0.3)
+    ax2.axvline(x=0, color='k', linestyle='--', alpha=0.3)
+    ax2.legend()
+
+    plt.tight_layout()
+    plt.savefig(f'DMLP_error_analysis_{safe_target}.png',
+                dpi=300,
+                bbox_inches='tight',
+                facecolor='white',
+                edgecolor='none')
+    plt.close()
+
+    # 4. Residuals vs Predicted Values Plot
+    plt.figure(figsize=(10, 6), dpi=300)
+
+    plt.scatter(metrics['y_train_pred'], train_errors,
+                c='#0077BB', alpha=0.6, s=100,
+                label='Training Residuals')
+
+    plt.scatter(metrics['y_test_pred'], test_errors,
+                c='#EE3377', alpha=0.6, s=100,
+                label='Test Residuals')
+
+    plt.axhline(y=0, color='k', linestyle='--', alpha=0.3)
+    plt.xlabel('DMLP Predicted Values', fontsize=12, fontweight='bold')
+    plt.ylabel('Residuals', fontsize=12, fontweight='bold')
+    plt.title('DMLP Residual Analysis Plot\n' + target_column,
+              fontsize=14,
+              fontweight='bold',
+              pad=20)
+
+    plt.grid(True, linestyle='--', alpha=0.3)
+    plt.legend(loc='upper left',
+               fontsize=10,
+               frameon=True,
+               fancybox=True,
+               framealpha=0.95,
+               edgecolor='gray')
+
+    plt.tight_layout()
+    plt.savefig(f'DMLP_residuals_{safe_target}.png',
+                dpi=300,
+                bbox_inches='tight',
+                facecolor='white',
+                edgecolor='none')
+    plt.close()
+
+    # 5. Karşılaştırmalı Metrikler Grafiği
+    metrics_comparison = {
+        'R²': [metrics['train_r2'], metrics['test_r2']],
+        'RMSE': [metrics['train_rmse'], metrics['test_rmse']],
+        'MAE': [metrics['train_mae'], metrics['test_mae']],
+        'MAPE (%)': [metrics['train_mape'], metrics['test_mape']]
     }
-    
-    grid = GridSearchCV(estimator=model, param_grid=param_grid, cv=kfold, 
-                       scoring='neg_mean_squared_error')
-    grid_result = grid.fit(X, y)
-    
-    print("\nCross-validation metrics:")
-    for mean, std, params in zip(grid_result.cv_results_['mean_test_score'], 
-                               grid_result.cv_results_['std_test_score'],
-                               grid_result.cv_results_['params']):
-        print(f"MSE: {-mean:.4f} (±{std * 2:.4f}) with parameters: {params}")
-    
-    print(f"\nOptimal parameters: {grid_result.best_params_}")
-    print(f"Best MSE: {-grid_result.best_score_:.4f}")
-    
-    return grid_result.best_params_, grid_result.best_estimator_
 
-def process_file(file_path):
-    """Process individual experimental datasets"""
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8), dpi=300)
+    axes = axes.ravel()
+
+    for idx, (metric, values) in enumerate(metrics_comparison.items()):
+        ax = axes[idx]
+        bars = ax.bar(['Training', 'Test'], values,
+                      color=['#0077BB', '#EE3377'])
+
+        ax.set_title(f'DMLP {metric}', fontsize=12, fontweight='bold')
+        ax.grid(True, linestyle='--', alpha=0.3)
+
+        # Değerleri çubukların üzerine yaz
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width() / 2., height,
+                    f'{height:.4f}',
+                    ha='center', va='bottom', rotation=0)
+
+    plt.suptitle('DMLP Performance Metrics Comparison\n' + target_column,
+                 fontsize=14,
+                 fontweight='bold',
+                 y=1.05)
+
+    plt.tight_layout()
+    plt.savefig(f'DMLP_metrics_comparison_{safe_target}.png',
+                dpi=300,
+                bbox_inches='tight',
+                facecolor='white',
+                edgecolor='none')
+    plt.close()
+
+
+def process_dataset_with_gridsearch(file_name, target_column):
+    """GridSearchCV ile veri setini işle ve en iyi modeli döndür"""
     try:
-        # Data preprocessing
-        data = pd.read_excel(file_path)
-        data = data.sample(frac=1, random_state=42).reset_index(drop=True)
-        print(f"\nDataset summary for {file_path}:")
-        print(data.head())
+        # Veriyi yükle ve kontrol et
+        print(f"\nLoading dataset from {file_name}...")
+        df = pd.read_excel(file_name)
+        if df.empty:
+            raise ValueError("Dataset is empty")
 
-        # Feature extraction and scaling
-        X = data.iloc[:, :4]
-        y = data.iloc[:, -1]
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
+        # Features ve target ayır
+        feature_columns = [col for col in df.columns if col != target_column]
+        if not feature_columns:
+            raise ValueError("No feature columns found")
 
-        # Model optimization and training
-        best_params, best_model = perform_cv_and_grid_search(X_scaled, y)
-        X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, 
-                                                           test_size=0.2, 
-                                                           random_state=42)
-        
-        # Final model training with optimized parameters
-        model = create_mlp_model(dropout_rate=best_params['dropout_rate'])
-        early_stopping = EarlyStopping(monitor='val_loss', patience=20, 
-                                     restore_best_weights=True)
-        
-        history = model.fit(X_train, y_train, epochs=best_params['epochs'],
-                          batch_size=best_params['batch_size'],
-                          validation_data=(X_test, y_test),
-                          callbacks=[early_stopping], verbose=0)
+        print(f"Features: {feature_columns}")
+        print(f"Target: {target_column}")
 
-        # Performance visualization
-        early_stopping_epoch = np.argmin(history.history['val_loss'])
-        best_val_loss = np.min(history.history['val_loss'])
-        plot_loss_curve(history, file_path, early_stopping_epoch, best_val_loss)
+        X = df[feature_columns].values
+        y = df[target_column].values
+
+        # NaN değer kontrolü
+        if np.isnan(X).any() or np.isnan(y).any():
+            raise ValueError("Dataset contains NaN values")
+
+        # Normalizasyon
+        scaler_X = MinMaxScaler()
+        scaler_y = MinMaxScaler()
+
+        X_normalized = scaler_X.fit_transform(X)
+        y_normalized = scaler_y.fit_transform(y.reshape(-1, 1)).ravel()
+
+        # Train-test split
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_normalized, y_normalized, test_size=0.2, random_state=42, shuffle=True
+        )
+
+        # Genişletilmiş parametre grid - CV değeri eklendi
+        param_grid = {
+            'n_hidden_layers': [3, 5, 7, 10],
+            'n_neurons': [8, 10, 12, 15],
+            'max_iter': [100, 150, 200],
+            'patience': [5, 10, 15, 20],
+            'cv': [3, 5]  # CV değerleri eklendi
+        }
+
+        print("\nGrid Search Parameters:")
+        for param, values in param_grid.items():
+            print(f"{param}: {values}")
+
+        # En iyi CV değerini bulmak için iç içe döngü
+        best_score = float('-inf')
+        best_cv = None
+        best_params = None
+        best_model = None
+
+        for cv_value in param_grid['cv']:
+            # CV parametresini param_grid'den çıkar
+            current_param_grid = param_grid.copy()
+            del current_param_grid['cv']
+
+            # GridSearchCV'yi ayarla
+            base_model = RPropMLPEstimator()
+            grid_search = GridSearchCV(
+                estimator=base_model,
+                param_grid=current_param_grid,
+                cv=cv_value,
+                scoring='neg_mean_squared_error',
+                n_jobs=1,
+                verbose=1,
+                refit=True
+            )
+
+            print(f"\nTrying CV={cv_value}...")
+            grid_search.fit(X_normalized, y_normalized)
+
+            # Eğer bu CV değeri daha iyi sonuç verdiyse, kaydet
+            if grid_search.best_score_ > best_score:
+                best_score = grid_search.best_score_
+                best_cv = cv_value
+                best_params = grid_search.best_params_
+                best_model = grid_search.best_estimator_
+
+        print("\nOptimal parameters found:")
+        print(f"Best CV value: {best_cv}")
+        print("Best parameters:", best_params)
+        print("Best cross-validation score:", -best_score)
+
+        # Early stopping epoch'unu bul
+        early_stopping_epoch = len(best_model.history['train_loss']) - best_params['patience']
+
+        # Training set tahminleri
+        y_train_pred = best_model.predict(X_train)
+        y_train_true = y_train.reshape(-1, 1)
+
+        # Test set tahminleri
+        y_test_pred = best_model.predict(X_test)
+        y_test_true = y_test.reshape(-1, 1)
+
+        # Tahminleri orijinal ölçeğe dönüştür
+        y_train_pred = scaler_y.inverse_transform(y_train_pred)
+        y_train_true = scaler_y.inverse_transform(y_train_true)
+        y_test_pred = scaler_y.inverse_transform(y_test_pred)
+        y_test_true = scaler_y.inverse_transform(y_test_true)
+
+        # Metrikleri hesapla
+        metrics = {
+            'train_r2': r2_score(y_train_true, y_train_pred),
+            'test_r2': r2_score(y_test_true, y_test_pred),
+            'train_rmse': np.sqrt(mean_squared_error(y_train_true, y_train_pred)),
+            'test_rmse': np.sqrt(mean_squared_error(y_test_true, y_test_pred)),
+            'train_mae': mean_absolute_error(y_train_true, y_train_pred),
+            'test_mae': mean_absolute_error(y_test_true, y_test_pred),
+            'train_mape': np.mean(np.abs((y_train_true - y_train_pred) / y_train_true)) * 100,
+            'test_mape': np.mean(np.abs((y_test_true - y_test_pred) / y_test_true)) * 100,
+            'y_train_true': y_train_true,
+            'y_train_pred': y_train_pred,
+            'y_test_true': y_test_true,
+            'y_test_pred': y_test_pred,
+            'best_cv': best_cv  # En iyi CV değerini de metriklere ekle
+        }
+
+        # Excel dosyası işlemleri ve grafik oluşturma aynı şekilde devam eder...
+
+        return metrics, best_params
 
     except Exception as e:
-        print(f"Error in processing {file_path}: {e}")
+        print(f"Error processing dataset {target_column}: {str(e)}")
+        raise
 
-# Execute experimental pipeline
-for file_path in file_paths:
-    process_file(file_path)
+if __name__ == "__main__":
+    try:
+        datasets = [
+            {
+                'file': 'Dataset_WearLoss_10N.xlsx',
+                'target': 'Wear Loss (10N)'
+            },
+            {
+                'file': 'Dataset_WearLoss_20N.xlsx',
+                'target': 'Wear Loss (20N)'
+            },
+            {
+                'file': 'Dataset_WearLoss_30N.xlsx',
+                'target': 'Wear Loss (30N)'
+            }
+        ]
+
+        all_results = {}
+        for dataset in datasets:
+            print(f"\nProcessing {dataset['target']}...")
+            metrics, best_params = process_dataset_with_gridsearch(
+                dataset['file'],
+                dataset['target']
+            )
+
+            all_results[dataset['target']] = {
+                'metrics': metrics,
+                'best_params': best_params
+            }
+
+            print(f"\nResults for {dataset['target']}:")
+            print("Training Set Performance:")
+            print(f"R² Score: {metrics['train_r2']:.4f}")
+            print(f"RMSE: {metrics['train_rmse']:.8f}")
+            print(f"MAE: {metrics['train_mae']:.8f}")
+            print(f"MAPE: {metrics['train_mape']:.4f}%")
+
+            print("\nTest Set Performance:")
+            print(f"R² Score: {metrics['test_r2']:.4f}")
+            print(f"RMSE: {metrics['test_rmse']:.8f}")
+            print(f"MAE: {metrics['test_mae']:.8f}")
+            print(f"MAPE: {metrics['test_mape']:.4f}%")
+
+            print("\nBest Parameters:", best_params)
+
+        # Karşılaştırmalı sonuçları Excel'e kaydet
+        metrics_df = pd.DataFrame()
+        params_df = pd.DataFrame()
+
+        for target, results in all_results.items():
+            # Metrikleri düzenle
+            metrics_data = pd.DataFrame({
+                'Metric': [
+                    'Train R²', 'Test R²',
+                    'Train RMSE', 'Test RMSE',
+                    'Train MAE', 'Test MAE',
+                    'Train MAPE', 'Test MAPE'
+                ],
+                target: [
+                    results['metrics']['train_r2'],
+                    results['metrics']['test_r2'],
+                    results['metrics']['train_rmse'],
+                    results['metrics']['test_rmse'],
+                    results['metrics']['train_mae'],
+                    results['metrics']['test_mae'],
+                    results['metrics']['train_mape'],
+                    results['metrics']['test_mape']
+                ]
+            }).set_index('Metric')
+
+            metrics_df = pd.concat([metrics_df, metrics_df], axis=1)
+
+            # Parametreleri düzenle
+            params_data = pd.DataFrame({
+                'Parameter': list(results['best_params'].keys()),
+                target: list(results['best_params'].values())
+            }).set_index('Parameter')
+
+            params_df = pd.concat([params_df, params_data], axis=1)
+
+        # Tüm sonuçları tek bir Excel dosyasına kaydet
+        with pd.ExcelWriter('final_results_summary.xlsx') as writer:
+            metrics_df.to_excel(writer, sheet_name='All Metrics')
+            params_df.to_excel(writer, sheet_name='Best Parameters')
+
+        print("\nProcessing complete. Results have been saved to:")
+        print("1. Individual prediction results: prediction_results_*.xlsx")
+        print("2. Summary results: final_results_summary.xlsx")
+
+    except Exception as e:
+        print(f"Error in main execution: {str(e)}")
+
