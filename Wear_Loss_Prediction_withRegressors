@@ -1,108 +1,761 @@
+import logging
+import warnings
+from dataclasses import dataclass
+from enum import Enum, auto
+from pathlib import Path
+from typing import Dict, List, Tuple, Optional, Any
+
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split, cross_val_score, KFold
-from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+from sklearn.base import BaseEstimator
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.neural_network import MLPRegressor
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.pipeline import Pipeline
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from sklearn.model_selection import KFold, train_test_split
+from sklearn.preprocessing import PolynomialFeatures, StandardScaler, MinMaxScaler
 import matplotlib.pyplot as plt
-import warnings
+import seaborn as sns
+from abc import ABC, abstractmethod
+
+# Logging configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore')
 
-class RegressionModels:
-    def __init__(self):
-        self.models = {
-            'Linear': LinearRegression(),
-            'Polynomial': Pipeline([
-                ('poly', PolynomialFeatures(degree=2)),
-                ('linear', LinearRegression())
-            ]),
-            'RandomForest': RandomForestRegressor(
-                n_estimators=100, 
-                criterion='squared_error',
-                max_depth=None,
-                min_samples_split=2,
-                min_samples_leaf=1,
-                max_features=1.0,
-                bootstrap=True,
-                random_state=42
-            ),
-            'GradientBoosting': GradientBoostingRegressor(
-                n_estimators=500,
-                max_depth=4,
-                min_samples_split=5,
-                learning_rate=0.01,
-                loss='squared_error',
-                random_state=42
-            ),
-            'MLP': MLPRegressor(
-                hidden_layer_sizes=(10,)*5,
-                activation='relu',
-                solver='adam',
-                batch_size=32,
-                learning_rate='constant',
-                learning_rate_init=0.001,
-                max_iter=100,
-                early_stopping=True,
-                validation_fraction=0.2,
-                n_iter_no_change=20,
-                random_state=42
-            )
+
+def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series,
+                            save_dir: Optional[Path] = None) -> None:
+    try:
+        # Train ve test tahminleri için ayrı diziler
+        train_predictions = np.array([])
+        train_actual = np.array([])
+        test_predictions = np.array([])
+        test_actual = np.array([])
+
+        # KFold kullan
+        kf = KFold(n_splits=self.config.n_splits, shuffle=True, random_state=self.config.random_state)
+        fold_metrics = []
+
+        # Her fold için model eğit ve tahmin yap
+        for train_idx, test_idx in kf.split(X):
+            X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+            y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+
+            # Yeni model instance'ı oluştur
+            model, is_poly = self.models[model_name]
+            if isinstance(model, LinearRegression):
+                current_model = LinearRegression()
+            elif isinstance(model, GradientBoostingRegressor):
+                current_model = GradientBoostingRegressor(**self.config.gb_params)
+            elif isinstance(model, RandomForestRegressor):
+                current_model = RandomForestRegressor(**self.config.rf_params)
+
+            # Polynomial dönüşüm gerekiyorsa uygula
+            if is_poly:
+                X_train_processed = self.model_trainer.poly.fit_transform(X_train)
+                X_test_processed = self.model_trainer.poly.transform(X_test)
+            else:
+                X_train_processed = X_train
+                X_test_processed = X_test
+
+            # Model eğitimi ve tahminler
+            current_model.fit(X_train_processed, y_train)
+            y_train_pred = current_model.predict(X_train_processed)
+            y_test_pred = current_model.predict(X_test_processed)
+
+            # Train ve test tahminlerini ayrı sakla
+            train_predictions = np.append(train_predictions, y_train_pred)
+            train_actual = np.append(train_actual, y_train)
+            test_predictions = np.append(test_predictions, y_test_pred)
+            test_actual = np.append(test_actual, y_test)
+
+            # Test metriklerini hesapla
+            metrics = MetricsCalculator.calculate_metrics(y_test, y_test_pred)
+            fold_metrics.append(metrics)
+
+        # Ortalama metrikleri hesapla
+        avg_metrics = {
+            metric: np.mean([m[metric] for m in fold_metrics])
+            for metric in fold_metrics[0].keys()
         }
-        self.scores = {}
-        self.predictions = {}
-        self.cv_scores = {}
-        self.scaler = StandardScaler()
-        
-    def perform_cross_validation(self, X, y):
-        kfold = KFold(n_splits=5, shuffle=True, random_state=42)
-        cv_results = {}
-        
-        for name, model in self.models.items():
-            r2_scores = cross_val_score(model, X, y, cv=kfold, scoring='r2')
-            rmse_scores = np.sqrt(-cross_val_score(model, X, y, cv=kfold, 
-                                                 scoring='neg_mean_squared_error'))
-            
-            cv_results[name] = {
-                'r2_mean': r2_scores.mean(),
-                'r2_std': r2_scores.std(),
-                'rmse_mean': rmse_scores.mean(),
-                'rmse_std': rmse_scores.std()
+
+        # Grafik stilini ayarla
+        plt.style.use('seaborn')
+        plt.figure(figsize=(12, 8), dpi=100)
+
+        # Train ve test verilerini ayrı ayrı çiz
+        plt.scatter(train_actual, train_predictions,
+                    c='#2E86C1',  # Koyu mavi
+                    alpha=0.6,
+                    s=100,
+                    label='Training Data',
+                    edgecolors='white',
+                    linewidth=0.5)
+
+        plt.scatter(test_actual, test_predictions,
+                    c='#E74C3C',  # Kırmızı
+                    alpha=0.6,
+                    s=100,
+                    label='Test Data',
+                    edgecolors='white',
+                    linewidth=0.5)
+
+        # Mükemmel tahmin çizgisi için sınırları belirle
+        all_min = min(min(train_actual), min(test_actual),
+                      min(train_predictions), min(test_predictions))
+        all_max = max(max(train_actual), max(test_actual),
+                      max(train_predictions), max(test_predictions))
+        margin = (all_max - all_min) * 0.05
+
+        # Eksen sınırlarını ayarla
+        plt.xlim(all_min - margin, all_max + margin)
+        plt.ylim(all_min - margin, all_max + margin)
+
+        # Mükemmel tahmin çizgisi
+        plt.plot([all_min - margin, all_max + margin],
+                 [all_min - margin, all_max + margin],
+                 'k--',
+                 linewidth=1.5,
+                 label='Perfect Prediction',
+                 alpha=0.8)
+
+        # Etiketler ve başlık
+        plt.xlabel('Experimental Values', fontsize=14, fontweight='bold')
+        plt.ylabel('Predicted Values', fontsize=14, fontweight='bold')
+        plt.title(f'{model_name} - Experimental vs Predicted Values\n'
+                  f'(Scaling: {self.config.scaling_method})',
+                  fontsize=16,
+                  fontweight='bold',
+                  pad=20)
+
+        # Izgara çizgileri
+        plt.grid(True, linestyle='--', alpha=0.3)
+        plt.tick_params(axis='both', which='major', labelsize=12)
+
+        # Metrik kutusu
+        metrics_text = (
+            f'Cross-Validation Metrics (Mean):\n'
+            f'R² = {avg_metrics["R²"]:.4f}\n'
+            f'RMSE = {avg_metrics["RMSE"]:.4f}\n'
+            f'MAE = {avg_metrics["MAE"]:.4f}\n'
+            f'MAPE = {avg_metrics["MAPE"]:.2f}%'
+        )
+
+        # Metrik kutusu stili
+        bbox_props = dict(
+            boxstyle='round,pad=0.5',
+            fc='white',
+            ec='gray',
+            alpha=0.9,
+            mutation_scale=0.5
+        )
+
+        # Metrikleri sağ üst köşeye yerleştir
+        plt.text(0.98, 0.98, metrics_text,
+                 transform=plt.gca().transAxes,
+                 verticalalignment='top',
+                 horizontalalignment='right',
+                 bbox=bbox_props,
+                 fontsize=12)
+
+        # Legend'ı grafiğin dışına yerleştir
+        plt.legend(loc='center left',
+                   bbox_to_anchor=(1, 0.5),
+                   fontsize=12,
+                   frameon=True,
+                   facecolor='white',
+                   edgecolor='gray',
+                   shadow=True)
+
+        # Grafik düzenini ayarla
+        plt.tight_layout()
+        plt.subplots_adjust(right=0.85)
+
+        # Grafiği kaydet
+        if save_dir is not None:
+            save_path = save_dir / f'{model_name.lower().replace(" ", "_")}_prediction_plot.png'
+            plt.savefig(save_path,
+                        dpi=300,
+                        bbox_inches='tight',
+                        facecolor='white',
+                        edgecolor='none')
+            logger.info(f'Plot saved to {save_path}')
+
+        plt.show()
+        plt.close()
+
+    except Exception as e:
+        logger.error(f"Error in plotting predictions: {str(e)}")
+        raise
+
+def plot_all_models(self, X: pd.DataFrame, y: pd.Series, save_dir: Optional[Path] = None) -> None:
+    """Plot predictions for all models"""
+    for model_name in self.models.keys():
+        self.plot_prediction_results(model_name, X, y, save_dir=save_dir)
+
+class ScalingMethod(Enum):
+    """Scaling methods enumeration"""
+    NONE = "none"
+    STANDARD = "standard"
+    MINMAX = "minmax"
+
+    def __str__(self):
+        return self.value
+
+
+@dataclass(frozen=True)
+class ModelConfig:
+    """Immutable model configuration"""
+    n_splits: int
+    random_state: int
+    polynomial_degree: int
+    scaling_method: ScalingMethod
+    validation_size: float
+    early_stopping_rounds: int
+    gb_params: Dict[str, Any]
+    rf_params: Dict[str, Any]
+
+    def __post_init__(self):
+        """Validate configuration parameters"""
+        if not isinstance(self.n_splits, int) or self.n_splits < 2:
+            raise ValueError("n_splits must be an integer >= 2")
+        if not isinstance(self.random_state, int):
+            raise ValueError("random_state must be an integer")
+        if not isinstance(self.polynomial_degree, int) or self.polynomial_degree < 1:
+            raise ValueError("polynomial_degree must be an integer >= 1")
+        if not isinstance(self.validation_size, float) or not 0 < self.validation_size < 1:
+            raise ValueError("validation_size must be a float between 0 and 1")
+        if not isinstance(self.early_stopping_rounds, int) or self.early_stopping_rounds < 1:
+            raise ValueError("early_stopping_rounds must be a positive integer")
+
+
+class MetricsCalculator:
+    """Calculate and validate model metrics"""
+
+    @staticmethod
+    def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
+        """Calculate regression metrics with validation"""
+        if len(y_true) != len(y_pred):
+            raise ValueError("Length mismatch between y_true and y_pred")
+        if np.any(np.isnan(y_true)) or np.any(np.isnan(y_pred)):
+            raise ValueError("Input contains NaN values")
+
+        # Avoid division by zero in MAPE calculation
+        mape = np.mean(np.abs((y_true - y_pred) / np.maximum(1e-10, np.abs(y_true)))) * 100
+
+        return {
+            'R²': float(r2_score(y_true, y_pred)),
+            'RMSE': float(np.sqrt(mean_squared_error(y_true, y_pred))),
+            'MAE': float(mean_absolute_error(y_true, y_pred)),
+            'MAPE': float(mape)
+        }
+
+
+class DataProcessor:
+    """Handle data loading and preprocessing"""
+
+    def __init__(self, scaling_method: ScalingMethod):
+        self.scaling_method = scaling_method
+        self.scaler = self._get_scaler()
+        self.feature_names: List[str] = []
+        self._is_fitted = False
+
+    def _get_scaler(self) -> Optional[BaseEstimator]:
+        """Get appropriate scaler based on scaling method"""
+        if self.scaling_method == ScalingMethod.STANDARD:
+            return StandardScaler()
+        elif self.scaling_method == ScalingMethod.MINMAX:
+            return MinMaxScaler()
+        return None
+
+    def load_and_preprocess(self, file_path: Path) -> Tuple[pd.DataFrame, pd.Series]:
+        """Load and preprocess data with comprehensive validation"""
+        try:
+            if not file_path.exists():
+                raise FileNotFoundError(f"File not found: {file_path}")
+
+            logger.info(f"Loading data from {file_path}")
+            df = pd.read_excel(file_path)
+
+            # Validate data structure
+            self._validate_data(df)
+
+            # Split features and target
+            X = df.iloc[:, :4]  # First 4 columns are features
+            y = df.iloc[:, 4]  # 5th column is target
+
+            # Store feature names
+            self.feature_names = X.columns.tolist()
+
+            # Apply scaling if needed
+            X_processed = self._scale_features(X)
+
+            logger.info("Data preprocessing completed successfully")
+            return X_processed, y
+
+        except Exception as e:
+            logger.error(f"Error in data processing: {str(e)}")
+            raise
+
+    def _validate_data(self, df: pd.DataFrame) -> None:
+        """Comprehensive data validation"""
+        if df.empty:
+            raise ValueError("Empty dataset")
+
+        if df.shape[1] < 5:
+            raise ValueError(f"Dataset must have at least 5 columns, found {df.shape[1]}")
+
+        if df.isnull().any().any():
+            null_counts = df.isnull().sum()
+            raise ValueError(f"Dataset contains missing values:\n{null_counts}")
+
+        if not all(df.dtypes.apply(lambda x: np.issubdtype(x, np.number))):
+            non_numeric = df.dtypes[~df.dtypes.apply(lambda x: np.issubdtype(x, np.number))]
+            raise ValueError(f"All columns must be numeric. Non-numeric columns:\n{non_numeric}")
+
+        if df.std().min() == 0:
+            zero_var_cols = df.columns[df.std() == 0].tolist()
+            raise ValueError(f"Zero variance detected in columns: {zero_var_cols}")
+
+    def _scale_features(self, X: pd.DataFrame) -> pd.DataFrame:
+        """Scale features if scaling is enabled"""
+        if self.scaler is None:
+            return X.copy()
+
+        try:
+            if not self._is_fitted:
+                X_scaled = pd.DataFrame(
+                    self.scaler.fit_transform(X),
+                    columns=X.columns,
+                    index=X.index
+                )
+                self._is_fitted = True
+            else:
+                X_scaled = pd.DataFrame(
+                    self.scaler.transform(X),
+                    columns=X.columns,
+                    index=X.index
+                )
+
+            # Validate scaled output
+            if X_scaled.isnull().any().any():
+                raise ValueError("Scaling produced NaN values")
+
+            return X_scaled
+
+        except Exception as e:
+            logger.error(f"Error during feature scaling: {str(e)}")
+            raise
+
+
+class ModelTrainer:
+    """Handle model training and evaluation"""
+
+    def __init__(self, config: ModelConfig):
+        self.config = config
+        self.poly = PolynomialFeatures(
+            degree=config.polynomial_degree,
+            include_bias=False
+        )
+
+    def train_and_evaluate(
+            self,
+            model: BaseEstimator,
+            X_train: pd.DataFrame,
+            X_test: pd.DataFrame,
+            y_train: pd.Series,
+            y_test: pd.Series,
+            is_polynomial: bool = False
+    ) -> Dict[str, Dict[str, float]]:
+        """Train and evaluate a model with proper validation"""
+        try:
+            # Transform features if polynomial
+            if is_polynomial:
+                X_train_processed = self.poly.fit_transform(X_train)
+                X_test_processed = self.poly.transform(X_test)
+            else:
+                X_train_processed = X_train
+                X_test_processed = X_test
+
+            # Validate transformed data
+            self._validate_transformed_data(X_train_processed, X_test_processed)
+
+            # Train model
+            model.fit(X_train_processed, y_train)
+
+            # Generate predictions
+            y_train_pred = model.predict(X_train_processed)
+            y_test_pred = model.predict(X_test_processed)
+
+            # Calculate metrics
+            train_metrics = MetricsCalculator.calculate_metrics(y_train, y_train_pred)
+            test_metrics = MetricsCalculator.calculate_metrics(y_test, y_test_pred)
+
+            return {
+                'train': train_metrics,
+                'test': test_metrics
             }
-            
-        return cv_results
 
-    def evaluate_model(self, model_name):
-        model = self.models[model_name]
-        
-        # Make predictions
-        y_train_pred = model.predict(self.X_train_scaled)
-        y_test_pred = model.predict(self.X_test_scaled)
-        
-        # Store predictions
-        self.predictions[model_name] = {
-            'train': y_train_pred,
-            'test': y_test_pred
+        except Exception as e:
+            logger.error(f"Error in model training/evaluation: {str(e)}")
+            raise
+
+    def _validate_transformed_data(self, X_train: np.ndarray, X_test: np.ndarray) -> None:
+        """Validate transformed feature data"""
+        if np.any(np.isnan(X_train)) or np.any(np.isnan(X_test)):
+            raise ValueError("NaN values detected in transformed features")
+        if np.any(np.isinf(X_train)) or np.any(np.isinf(X_test)):
+            raise ValueError("Infinite values detected in transformed features")
+
+
+class WearLossPredictor:
+    """Main class for wear loss prediction"""
+
+    def __init__(self, config: ModelConfig):
+        self.config = config
+        self.data_processor = DataProcessor(config.scaling_method)
+        self.model_trainer = ModelTrainer(config)
+        self.models = self._initialize_models()
+        self.results: Dict[str, Dict] = {}
+
+    def _initialize_models(self) -> Dict[str, Tuple[BaseEstimator, bool]]:
+        """Initialize models with configuration"""
+        return {
+            'Linear Regression': (LinearRegression(), False),
+            'Polynomial Regression': (LinearRegression(), True),
+            'Gradient Boosting': (GradientBoostingRegressor(**self.config.gb_params), False),
+            'Random Forest': (RandomForestRegressor(**self.config.rf_params), False)
         }
-        
-        # Calculate metrics
-        self.scores[model_name] = {
-            'train_rmse': np.sqrt(mean_squared_error(self.y_train, y_train_pred)),
-            'test_rmse': np.sqrt(mean_squared_error(self.y_test, y_test_pred)),
-            'train_r2': r2_score(self.y_train, y_train_pred),
-            'test_r2': r2_score(self.y_test, y_test_pred)
-        }
 
-    def train_all_models(self):
-        for name, model in self.models.items():
-            print(f"\nTraining {name}...")
-            model.fit(self.X_train_scaled, self.y_train)
-            self.evaluate_model(name)
-            
-        # Perform cross-validation
-        self.cv_scores = self.perform_cross_validation(self.X_train_scaled, self.y_train)
+    def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series,
+                                save_dir: Optional[Path] = None) -> None:
+        try:
+            # Tüm tahminleri ve gerçek değerleri saklamak için diziler
+            all_predictions = np.array([])
+            all_actual = np.array([])
 
-    # [Rest of the class methods remain the same: read_excel_data, prepare_data, 
-    # process_all_datasets, get_feature_importance, plot_results, print_metrics]
+            # KFold kullan
+            kf = KFold(n_splits=self.config.n_splits, shuffle=True, random_state=self.config.random_state)
+            fold_metrics = []
+
+            # Her fold için model eğit ve tahmin yap
+            for train_idx, test_idx in kf.split(X):
+                X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+                y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+
+                # Yeni model instance'ı oluştur
+                model, is_poly = self.models[model_name]
+                if isinstance(model, LinearRegression):
+                    current_model = LinearRegression()
+                elif isinstance(model, GradientBoostingRegressor):
+                    current_model = GradientBoostingRegressor(**self.config.gb_params)
+                elif isinstance(model, RandomForestRegressor):
+                    current_model = RandomForestRegressor(**self.config.rf_params)
+
+                # Polynomial dönüşüm gerekiyorsa uygula
+                if is_poly:
+                    X_train_processed = self.model_trainer.poly.fit_transform(X_train)
+                    X_test_processed = self.model_trainer.poly.transform(X_test)
+                else:
+                    X_train_processed = X_train
+                    X_test_processed = X_test
+
+                # Model eğitimi ve tahminler
+                current_model.fit(X_train_processed, y_train)
+                y_test_pred = current_model.predict(X_test_processed)
+
+                # Test tahminlerini ve gerçek değerleri sakla
+                all_predictions = np.append(all_predictions, y_test_pred)
+                all_actual = np.append(all_actual, y_test)
+
+                # Metrikleri hesapla
+                metrics = MetricsCalculator.calculate_metrics(y_test, y_test_pred)
+                fold_metrics.append(metrics)
+
+            # Ortalama metrikleri hesapla
+            avg_metrics = {
+                metric: np.mean([m[metric] for m in fold_metrics])
+                for metric in fold_metrics[0].keys()
+            }
+
+            # Grafik çizimi
+            plt.figure(figsize=(10, 8))
+
+            # Tüm test verilerini tek grafikte göster
+            plt.scatter(all_actual, all_predictions, c='blue', alpha=0.5, label='Test Data')
+
+            # Mükemmel tahmin çizgisi
+            min_val = min(all_actual.min(), all_predictions.min())
+            max_val = max(all_actual.max(), all_predictions.max())
+            plt.plot([min_val, max_val], [min_val, max_val], 'k--', label='Perfect Prediction')
+
+            # Etiketler ve başlık
+            plt.xlabel('Experimental Values', fontsize=12)
+            plt.ylabel('Predicted Values', fontsize=12)
+            plt.title(f'{model_name} - Experimental vs Predicted Values\n'
+                      f'(Scaling: {self.config.scaling_method})', fontsize=14)
+
+            # Metrikleri metin olarak ekle
+            metrics_text = (
+                f'Cross-Validation Metrics (Mean):\n'
+                f'R² = {avg_metrics["R²"]:.4f}\n'
+                f'RMSE = {avg_metrics["RMSE"]:.4f}\n'
+                f'MAE = {avg_metrics["MAE"]:.4f}\n'
+                f'MAPE = {avg_metrics["MAPE"]:.2f}%'
+            )
+
+            plt.text(0.05, 0.95, metrics_text,
+                     transform=plt.gca().transAxes,
+                     verticalalignment='top',
+                     bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+
+            plt.grid(True, linestyle='--', alpha=0.7)
+            plt.legend()
+            plt.tight_layout()
+
+            # Grafiği kaydet
+            if save_dir is not None:
+                save_path = save_dir / f'{model_name.lower().replace(" ", "_")}_prediction_plot.png'
+                plt.savefig(save_path, dpi=300, bbox_inches='tight')
+                logger.info(f'Plot saved to {save_path}')
+
+            plt.show()
+            plt.close()
+
+        except Exception as e:
+            logger.error(f"Error in plotting predictions: {str(e)}")
+            raise
+
+    def plot_all_models(self, X: pd.DataFrame, y: pd.Series, save_dir: Optional[Path] = None) -> None:
+        """Plot predictions for all models"""
+        for model_name in self.models.keys():
+            self.plot_prediction_results(model_name, X, y, save_dir=save_dir)
+
+    def run_analysis(self, file_path: Path) -> pd.DataFrame:
+        """Run complete analysis pipeline"""
+        try:
+            # Load and preprocess data
+            X, y = self.data_processor.load_and_preprocess(file_path)
+
+            # Initialize cross-validation
+            kf = KFold(
+                n_splits=self.config.n_splits,
+                shuffle=True,
+                random_state=self.config.random_state
+            )
+
+            # Store results for each model
+            model_results = []
+
+            # Evaluate each model
+            for model_name, (model, is_polynomial) in self.models.items():
+                logger.info(f"Evaluating {model_name}")
+                fold_results = self._evaluate_model(model, is_polynomial, X, y, kf)
+                model_results.append({
+                    'Model': model_name,
+                    **self._format_results(fold_results)
+                })
+
+            # Convert results to DataFrame
+            results_df = pd.DataFrame(model_results)
+            self.results[str(self.config.scaling_method)] = results_df
+
+            return results_df
+
+        except Exception as e:
+            logger.error(f"Error in analysis pipeline: {str(e)}")
+            raise
+
+    def _evaluate_model(
+            self,
+            model: BaseEstimator,
+            is_polynomial: bool,
+            X: pd.DataFrame,
+            y: pd.Series,
+            kf: KFold
+    ) -> List[Dict[str, Dict[str, float]]]:
+        """Evaluate a single model using cross-validation"""
+        fold_results = []
+
+        for fold, (train_idx, test_idx) in enumerate(kf.split(X), 1):
+            logger.info(f"Processing fold {fold}/{self.config.n_splits}")
+
+            # Split data
+            X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+            y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+
+            # Create fresh model instance
+            if isinstance(model, LinearRegression):
+                model_instance = LinearRegression()
+            elif isinstance(model, GradientBoostingRegressor):
+                model_instance = GradientBoostingRegressor(**self.config.gb_params)
+            elif isinstance(model, RandomForestRegressor):
+                model_instance = RandomForestRegressor(**self.config.rf_params)
+
+            # Train and evaluate
+            fold_metrics = self.model_trainer.train_and_evaluate(
+                model_instance, X_train, X_test, y_train, y_test, is_polynomial
+            )
+            fold_results.append(fold_metrics)
+
+        return fold_results
+
+    def _format_results(self, fold_results: List[Dict[str, Dict[str, float]]]) -> Dict[str, str]:
+        """Format results with mean and standard deviation"""
+        formatted_results = {}
+
+        for split in ['train', 'test']:
+            for metric in ['R²', 'RMSE', 'MAE', 'MAPE']:
+                values = [fold[split][metric] for fold in fold_results]
+                formatted_results[f"{split.capitalize()} {metric} (mean ± std)"] = (
+                    f"{np.mean(values):.4f} ± {np.std(values):.4f}"
+                )
+
+        return formatted_results
+
+
+def main():
+    """Main execution function with error handling"""
+    try:
+        # Setup paths
+        fileName = "Dataset_WearLoss_30N"
+        file_path = Path(fileName + ".xlsx")
+        output_dir = Path("results")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create plots directory
+        plots_dir = output_dir / "plots"
+        plots_dir.mkdir(exist_ok=True)
+
+        # Configure logging for file
+        file_handler = logging.FileHandler(output_dir / "analysis.log")
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        ))
+        logger.addHandler(file_handler)
+
+        logger.info("Starting wear loss analysis")
+
+        # Default configuration
+        config = ModelConfig(
+            n_splits=3,
+            random_state=42,
+            polynomial_degree=2,
+            scaling_method=ScalingMethod.STANDARD,
+            validation_size=0.2,
+            early_stopping_rounds=20,
+            gb_params={
+                'n_estimators': 1000,
+                'learning_rate': 0.05,
+                'max_depth': 4,
+                'subsample': 0.8,
+                'random_state': 42
+            },
+            rf_params={
+                'n_estimators': 1000,
+                'max_depth': None,
+                'oob_score': True,
+                'warm_start': True,
+                'random_state': 42
+            }
+        )
+
+        # Initialize predictor and run analysis
+        predictor = WearLossPredictor(config)
+        logger.info("Running analysis with standard scaling")
+        results = predictor.run_analysis(file_path)
+
+        # Load data for plotting
+        X, y = predictor.data_processor.load_and_preprocess(file_path)
+
+        # Generate and save plots
+        logger.info("Generating prediction plots")
+        predictor.plot_all_models(X, y, save_dir=plots_dir)
+
+        # Save results to CSV
+        results_file = Path(output_dir) / f"{fileName}_model_results.csv"
+        results.to_csv(results_file, index=False)
+        logger.info(f"Results saved to {results_file}")
+
+        # Save results to Excel with formatting
+        excel_file = output_dir / f"{fileName}_model_results.xlsx"
+        with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
+            results.to_excel(writer, index=False, sheet_name='Results')
+            workbook = writer.book
+            worksheet = writer.sheets['Results']
+
+            # Apply formatting
+            for column in worksheet.columns:
+                max_length = 0
+                column = list(column)
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = (max_length + 2)
+                worksheet.column_dimensions[column[0].column_letter].width = adjusted_width
+
+        logger.info(f"Formatted results saved to {excel_file}")
+
+        # Display results
+        print("\nModel Evaluation Results:")
+        print("=" * 100)
+        print(results.to_string(index=False))
+        print("\nAnalysis completed successfully!")
+
+        # Optional: Run additional scaling methods comparison
+        if input("\nWould you like to compare different scaling methods? (y/n): ").lower() == 'y':
+            scaling_results = {}
+
+            for scaling_method in ScalingMethod:
+                logger.info(f"Running analysis with {scaling_method.value} scaling")
+                config = ModelConfig(
+                    n_splits=3,
+                    random_state=42,
+                    polynomial_degree=2,
+                    scaling_method=scaling_method,
+                    validation_size=0.2,
+                    early_stopping_rounds=20,
+                    gb_params=config.gb_params,
+                    rf_params=config.rf_params
+                )
+
+                predictor = WearLossPredictor(config)
+                scaling_results[scaling_method.value] = predictor.run_analysis(file_path)
+
+                # Generate plots for each scaling method
+                X, y = predictor.data_processor.load_and_preprocess(file_path)
+                scaling_plots_dir = plots_dir / f"scaling_{scaling_method.value}"
+                scaling_plots_dir.mkdir(exist_ok=True)
+                predictor.plot_all_models(X, y, save_dir=scaling_plots_dir)
+
+            # Save comparative results
+            comparative_dir = output_dir / f"{fileName}_scaling_comparison"
+            comparative_dir.mkdir(exist_ok=True)
+
+            for scaling_method, results_df in scaling_results.items():
+                results_df.to_csv(
+                    comparative_dir / f"results_{scaling_method}.csv",
+                    index=False
+                )
+
+            logger.info("Scaling comparison completed")
+            print("\nScaling comparison results and plots have been saved to the respective directories")
+
+    except Exception as e:
+        logger.error(f"Error in main execution: {str(e)}")
+        print(f"\nError occurred: {str(e)}")
+        raise
+    finally:
+        # Remove file handler to avoid duplicate logs
+        logger.removeHandler(file_handler)
+        file_handler.close()
+
+
+if __name__ == "__main__":
+    main()
