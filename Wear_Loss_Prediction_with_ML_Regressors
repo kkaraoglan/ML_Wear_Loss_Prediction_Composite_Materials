@@ -519,7 +519,6 @@ class WearLossPredictor:
 
             # Metrikleri metin olarak sağ alt köşeye ekle (şık ve bold yazılar)
             metrics_text = (
-                f'Cross-Validation Metrics (Mean):\n'
                 f'R² = {avg_metrics["R²"]:.4f}\n'
                 f'RMSE = {avg_metrics["RMSE"]:.4f}\n'
                 f'MAE = {avg_metrics["MAE"]:.4f}\n'
@@ -650,11 +649,11 @@ def main():
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Create plots directory
-        plots_dir = output_dir / "plots"
+        plots_dir = output_dir / f"{fileName}_plots"
         plots_dir.mkdir(exist_ok=True)
 
         # Configure logging for file
-        file_handler = logging.FileHandler(output_dir / "analysis.log")
+        file_handler = logging.FileHandler(output_dir / f"{fileName}_analysis.log")
         file_handler.setFormatter(logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         ))
