@@ -441,6 +441,13 @@ class WearLossPredictor:
             kf = KFold(n_splits=self.config.n_splits, shuffle=True, random_state=self.config.random_state)
             fold_metrics = []
 
+            # Grafik için eğitim ve test noktalarını saklamak
+            train_actual_all = np.array([])
+            train_predictions_all = np.array([])
+
+            test_actual_all = np.array([])
+            test_predictions_all = np.array([])
+
             # Her fold için model eğit ve tahmin yap
             for train_idx, test_idx in kf.split(X):
                 X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
@@ -465,11 +472,16 @@ class WearLossPredictor:
 
                 # Model eğitimi ve tahminler
                 current_model.fit(X_train_processed, y_train)
-                y_test_pred = current_model.predict(X_test_processed)
 
-                # Test tahminlerini ve gerçek değerleri sakla
-                all_predictions = np.append(all_predictions, y_test_pred)
-                all_actual = np.append(all_actual, y_test)
+                # Test tahminleri ve gerçek değerleri
+                y_test_pred = current_model.predict(X_test_processed)
+                test_predictions_all = np.append(test_predictions_all, y_test_pred)
+                test_actual_all = np.append(test_actual_all, y_test)
+
+                # Eğitim tahminleri ve gerçek değerleri
+                y_train_pred = current_model.predict(X_train_processed)
+                train_predictions_all = np.append(train_predictions_all, y_train_pred)
+                train_actual_all = np.append(train_actual_all, y_train)
 
                 # Metrikleri hesapla
                 metrics = MetricsCalculator.calculate_metrics(y_test, y_test_pred)
@@ -484,21 +496,28 @@ class WearLossPredictor:
             # Grafik çizimi
             plt.figure(figsize=(10, 8))
 
-            # Tüm test verilerini tek grafikte göster
-            plt.scatter(all_actual, all_predictions, c='blue', alpha=0.5, label='Test Data')
+            # Eğitim verilerini farklı renk ve sembolle göster (nokta boyutu artırıldı)
+            plt.scatter(train_actual_all[:16], train_predictions_all[:16], c='green', alpha=0.7,
+                        label='Train Data', marker='o', s=100)  # s=100 ile nokta boyutu artırıldı
+
+            # Test verilerini farklı renk ve sembolle göster (nokta boyutu artırıldı)
+            plt.scatter(test_actual_all[:4], test_predictions_all[:4], c='blue', alpha=0.7,
+                        label='Test Data', marker='x', s=100)  # s=100 ile nokta boyutu artırıldı
 
             # Mükemmel tahmin çizgisi
-            min_val = min(all_actual.min(), all_predictions.min())
-            max_val = max(all_actual.max(), all_predictions.max())
+            min_val = min(train_actual_all.min(), train_predictions_all.min(),
+                          test_actual_all.min(), test_predictions_all.min())
+            max_val = max(train_actual_all.max(), train_predictions_all.max(),
+                          test_actual_all.max(), test_predictions_all.max())
             plt.plot([min_val, max_val], [min_val, max_val], 'k--', label='Perfect Prediction')
 
             # Etiketler ve başlık
-            plt.xlabel('Experimental Values', fontsize=12)
-            plt.ylabel('Predicted Values', fontsize=12)
+            plt.xlabel('Experimental Values', fontsize=14, fontweight='bold')
+            plt.ylabel('Predicted Values', fontsize=14, fontweight='bold')
             plt.title(f'{model_name} - Experimental vs Predicted Values\n'
-                      f'(Scaling: {self.config.scaling_method})', fontsize=14)
+                      f'(Scaling: {self.config.scaling_method})', fontsize=16, fontweight='bold')
 
-            # Metrikleri metin olarak ekle
+            # Metrikleri metin olarak sağ alt köşeye ekle (şık ve bold yazılar)
             metrics_text = (
                 f'Cross-Validation Metrics (Mean):\n'
                 f'R² = {avg_metrics["R²"]:.4f}\n'
@@ -506,14 +525,18 @@ class WearLossPredictor:
                 f'MAE = {avg_metrics["MAE"]:.4f}\n'
                 f'MAPE = {avg_metrics["MAPE"]:.2f}%'
             )
-
-            plt.text(0.05, 0.95, metrics_text,
+            plt.text(0.95, 0.05, metrics_text,
                      transform=plt.gca().transAxes,
-                     verticalalignment='top',
+                     verticalalignment='bottom',
+                     horizontalalignment='right',
+                     fontsize=14,
+                     fontweight='bold',  # Kalın yazı tipi
+                     fontname='Arial',  # Yazı tipini Arial olarak belirledik
                      bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
 
+            # Grafik özellikleri
             plt.grid(True, linestyle='--', alpha=0.7)
-            plt.legend()
+            plt.legend(fontsize=12, loc='upper left', frameon=False)
             plt.tight_layout()
 
             # Grafiği kaydet
