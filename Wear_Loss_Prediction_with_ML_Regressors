@@ -26,6 +26,157 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore')
 
 
+class PolynomialRegressionOptimizer:
+    def __init__(self, min_degree=2, max_degree=5, n_splits=3, random_state=42):
+        self.min_degree = min_degree
+        self.max_degree = max_degree
+        self.n_splits = n_splits
+        self.random_state = random_state
+        self.best_degree = None
+        self.best_score = float('-inf')
+        self.scores = {}
+        self.detailed_metrics = {}
+
+    def optimize(self, X: pd.DataFrame, y: pd.Series):
+        """Find optimal polynomial degree using cross-validation"""
+        kf = KFold(n_splits=self.n_splits, shuffle=True, random_state=self.random_state)
+
+        for degree in range(self.min_degree, self.max_degree + 1):
+            scores = []
+            rmse_scores = []
+            mae_scores = []
+
+            poly = PolynomialFeatures(degree=degree, include_bias=False)
+
+            for train_idx, val_idx in kf.split(X):
+                # Split data
+                X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
+                y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+
+                # Transform features
+                X_train_poly = poly.fit_transform(X_train)
+                X_val_poly = poly.transform(X_val)
+
+                # Fit model
+                model = LinearRegression()
+                model.fit(X_train_poly, y_train)
+
+                # Evaluate
+                y_pred = model.predict(X_val_poly)
+                scores.append(r2_score(y_val, y_pred))
+                rmse_scores.append(np.sqrt(mean_squared_error(y_val, y_pred)))
+                mae_scores.append(mean_absolute_error(y_val, y_pred))
+
+            avg_score = np.mean(scores)
+            self.scores[degree] = avg_score
+
+            # Detailed metrics for each degree
+            self.detailed_metrics[degree] = {
+                'R²': avg_score,
+                'RMSE': np.mean(rmse_scores),
+                'MAE': np.mean(mae_scores),
+                'Std R²': np.std(scores)
+            }
+
+            if avg_score > self.best_score:
+                self.best_score = avg_score
+                self.best_degree = degree
+
+        return self.best_degree, self.detailed_metrics
+
+    def plot_degree_scores(self, save_dir: Optional[Path] = None):
+        """
+        Plot R² scores and other metrics for different polynomial degrees
+
+        Parameters:
+        save_dir (Path, optional): Directory to save the plots
+        """
+        degrees = list(self.scores.keys())
+        scores = list(self.scores.values())
+
+        # Create figure with two subplots
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+
+        # R² scores plot
+        ax1.plot(degrees, scores, 'bo-')
+        ax1.axvline(x=self.best_degree, color='r', linestyle='--',
+                    label=f'Best Degree = {self.best_degree}')
+        ax1.set_xlabel('Polynomial Degree')
+        ax1.set_ylabel('R² Score')
+        ax1.set_title(f'Polynomial Regression (Degree {self.best_degree})\nR² Scores by Polynomial Degree')
+        ax1.grid(True)
+        ax1.legend()
+
+        # Error metrics plot
+        rmse_scores = [self.detailed_metrics[d]['RMSE'] for d in degrees]
+        mae_scores = [self.detailed_metrics[d]['MAE'] for d in degrees]
+
+        ax2.plot(degrees, rmse_scores, 'ro-', label='RMSE')
+        ax2.plot(degrees, mae_scores, 'go-', label='MAE')
+        ax2.set_xlabel('Polynomial Degree')
+        ax2.set_ylabel('Error')
+        ax2.set_title(f'Polynomial Regression (Degree {self.best_degree})\nError Metrics by Polynomial Degree')
+        ax2.grid(True)
+        ax2.legend()
+
+        plt.tight_layout()
+
+        # Save plots if save_dir is provided
+        if save_dir is not None:
+            # Create plots directory if it doesn't exist
+            save_dir = Path(save_dir)
+            save_dir.mkdir(parents=True, exist_ok=True)
+
+            # Save combined plot
+            combined_plot_path = save_dir / f'polynomial_optimization_combined.png'
+            plt.savefig(combined_plot_path, dpi=300, bbox_inches='tight')
+            logger.info(f'Combined plot saved to {combined_plot_path}')
+
+            # Save individual plots
+            plt.figure(figsize=(8, 6))
+
+            # Save R² plot
+            plt.plot(degrees, scores, 'bo-')
+            plt.axvline(x=self.best_degree, color='r', linestyle='--',
+                        label=f'Best Degree = {self.best_degree}')
+            plt.xlabel('Polynomial Degree')
+            plt.ylabel('R² Score')
+            plt.title(f'Polynomial Regression (Degree {self.best_degree})\nR² Scores by Polynomial Degree')
+            plt.grid(True)
+            plt.legend()
+            r2_plot_path = save_dir / f'polynomial_optimization_r2.png'
+            plt.savefig(r2_plot_path, dpi=300, bbox_inches='tight')
+            logger.info(f'R² plot saved to {r2_plot_path}')
+            plt.close()
+
+            # Save Error metrics plot
+            plt.figure(figsize=(8, 6))
+            plt.plot(degrees, rmse_scores, 'ro-', label='RMSE')
+            plt.plot(degrees, mae_scores, 'go-', label='MAE')
+            plt.xlabel('Polynomial Degree')
+            plt.ylabel('Error')
+            plt.title(f'Polynomial Regression (Degree {self.best_degree})\nError Metrics by Polynomial Degree')
+            plt.grid(True)
+            plt.legend()
+            error_plot_path = save_dir / f'polynomial_optimization_errors.png'
+            plt.savefig(error_plot_path, dpi=300, bbox_inches='tight')
+            logger.info(f'Error metrics plot saved to {error_plot_path}')
+            plt.close()
+
+        # Show the combined plot
+        plt.show()
+        plt.close()
+
+        # Print detailed metrics
+        print(f"\nBest Polynomial Degree: {self.best_degree}")
+        print("\nDetailed metrics for each degree:")
+        for degree in degrees:
+            metrics = self.detailed_metrics[degree]
+            print(f"\nDegree {degree}:")
+            print(f"R² = {metrics['R²']:.4f} (±{metrics['Std R²']:.4f})")
+            print(f"RMSE = {metrics['RMSE']:.4f}")
+            print(f"MAE = {metrics['MAE']:.4f}")
+
 def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series,
                             save_dir: Optional[Path] = None) -> None:
     try:
@@ -561,6 +712,40 @@ class WearLossPredictor:
         try:
             # Load and preprocess data
             X, y = self.data_processor.load_and_preprocess(file_path)
+            save_dir = Path("results")
+            file_name = file_path.stem  # Gets filename without extension
+            plots_dir = save_dir / f"{file_name}_plots"
+            plots_dir.mkdir(parents=True, exist_ok=True)
+
+            # Optimize polynomial degree if Polynomial Regression is used
+            if any(model_name == 'Polynomial Regression' for model_name in self.models.keys()):
+                logger.info("Optimizing polynomial regression degree...")
+                optimizer = PolynomialRegressionOptimizer(
+                    min_degree=2,
+                    max_degree=5,
+                    n_splits=self.config.n_splits,
+                    random_state=self.config.random_state
+                )
+                best_degree, detailed_metrics = optimizer.optimize(X, y)
+
+                # plots_dir'i plots_dir/polynomial_optimization olarak güncelleyin
+                poly_plots_dir = plots_dir / 'polynomial_optimization'
+                optimizer.plot_degree_scores(save_dir=poly_plots_dir)
+
+                # Update config with optimal degree
+                self.config = ModelConfig(
+                    n_splits=self.config.n_splits,
+                    random_state=self.config.random_state,
+                    polynomial_degree=best_degree,  # Update polynomial degree
+                    scaling_method=self.config.scaling_method,
+                    validation_size=self.config.validation_size,
+                    early_stopping_rounds=self.config.early_stopping_rounds,
+                    gb_params=self.config.gb_params,
+                    rf_params=self.config.rf_params
+                )
+
+                # Reinitialize model trainer with new config
+                self.model_trainer = ModelTrainer(self.config)
 
             # Initialize cross-validation
             kf = KFold(
