@@ -177,25 +177,31 @@ class PolynomialRegressionOptimizer:
             print(f"RMSE = {metrics['RMSE']:.4f}")
             print(f"MAE = {metrics['MAE']:.4f}")
 
+
 def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series,
                             save_dir: Optional[Path] = None) -> None:
     try:
-        # Train ve test tahminleri için ayrı diziler
-        train_predictions = np.array([])
-        train_actual = np.array([])
-        test_predictions = np.array([])
-        test_actual = np.array([])
+        # Tüm tahminleri ve gerçek değerleri saklamak için diziler
+        all_predictions = np.array([])
+        all_actual = np.array([])
 
         # KFold kullan
         kf = KFold(n_splits=self.config.n_splits, shuffle=True, random_state=self.config.random_state)
         fold_metrics = []
+
+        # Grafik için eğitim ve test noktalarını saklamak
+        train_actual_all = np.array([])
+        train_predictions_all = np.array([])
+
+        test_actual_all = np.array([])
+        test_predictions_all = np.array([])
 
         # Her fold için model eğit ve tahmin yap
         for train_idx, test_idx in kf.split(X):
             X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
             y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
-            # Yeni model instance'ı oluştur
+            # Model ve veri hazırlığı
             model, is_poly = self.models[model_name]
             if isinstance(model, LinearRegression):
                 current_model = LinearRegression()
@@ -204,7 +210,7 @@ def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series
             elif isinstance(model, RandomForestRegressor):
                 current_model = RandomForestRegressor(**self.config.rf_params)
 
-            # Polynomial dönüşüm gerekiyorsa uygula
+            # Polynomial dönüşüm
             if is_poly:
                 X_train_processed = self.model_trainer.poly.fit_transform(X_train)
                 X_test_processed = self.model_trainer.poly.transform(X_test)
@@ -214,16 +220,18 @@ def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series
 
             # Model eğitimi ve tahminler
             current_model.fit(X_train_processed, y_train)
-            y_train_pred = current_model.predict(X_train_processed)
+
+            # Test tahminleri
             y_test_pred = current_model.predict(X_test_processed)
+            test_predictions_all = np.append(test_predictions_all, y_test_pred)
+            test_actual_all = np.append(test_actual_all, y_test)
 
-            # Train ve test tahminlerini ayrı sakla
-            train_predictions = np.append(train_predictions, y_train_pred)
-            train_actual = np.append(train_actual, y_train)
-            test_predictions = np.append(test_predictions, y_test_pred)
-            test_actual = np.append(test_actual, y_test)
+            # Eğitim tahminleri
+            y_train_pred = current_model.predict(X_train_processed)
+            train_predictions_all = np.append(train_predictions_all, y_train_pred)
+            train_actual_all = np.append(train_actual_all, y_train)
 
-            # Test metriklerini hesapla
+            # Metrikleri hesapla
             metrics = MetricsCalculator.calculate_metrics(y_test, y_test_pred)
             fold_metrics.append(metrics)
 
@@ -233,106 +241,71 @@ def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series
             for metric in fold_metrics[0].keys()
         }
 
-        # Grafik stilini ayarla
-        plt.style.use('seaborn')
-        plt.figure(figsize=(12, 8), dpi=100)
+        # Grafik çizimi - Boyutlar %20 artırıldı
+        plt.figure(figsize=(12, 10))  # Figure boyutu artırıldı
 
-        # Train ve test verilerini ayrı ayrı çiz
-        plt.scatter(train_actual, train_predictions,
-                    c='#2E86C1',  # Koyu mavi
-                    alpha=0.6,
-                    s=100,
-                    label='Training Data',
-                    edgecolors='white',
-                    linewidth=0.5)
+        # Font boyutlarını artır
+        plt.rcParams.update({'font.size': 14})  # Genel font boyutu artışı
 
-        plt.scatter(test_actual, test_predictions,
-                    c='#E74C3C',  # Kırmızı
-                    alpha=0.6,
-                    s=100,
-                    label='Test Data',
-                    edgecolors='white',
-                    linewidth=0.5)
+        # Eğitim verilerini göster (nokta boyutu artırıldı)
+        plt.scatter(train_actual_all[:16], train_predictions_all[:16],
+                    c='green', alpha=0.7,
+                    label='Train Data', marker='o', s=120)
 
-        # Mükemmel tahmin çizgisi için sınırları belirle
-        all_min = min(min(train_actual), min(test_actual),
-                      min(train_predictions), min(test_predictions))
-        all_max = max(max(train_actual), max(test_actual),
-                      max(train_predictions), max(test_predictions))
-        margin = (all_max - all_min) * 0.05
-
-        # Eksen sınırlarını ayarla
-        plt.xlim(all_min - margin, all_max + margin)
-        plt.ylim(all_min - margin, all_max + margin)
+        # Test verilerini göster (nokta boyutu artırıldı)
+        plt.scatter(test_actual_all[:4], test_predictions_all[:4],
+                    c='blue', alpha=0.7,
+                    label='Test Data', marker='x', s=120)
 
         # Mükemmel tahmin çizgisi
-        plt.plot([all_min - margin, all_max + margin],
-                 [all_min - margin, all_max + margin],
-                 'k--',
-                 linewidth=1.5,
-                 label='Perfect Prediction',
-                 alpha=0.8)
+        min_val = min(train_actual_all.min(), train_predictions_all.min(),
+                      test_actual_all.min(), test_predictions_all.min())
+        max_val = max(train_actual_all.max(), train_predictions_all.max(),
+                      test_actual_all.max(), test_predictions_all.max())
+        plt.plot([min_val, max_val], [min_val, max_val], 'k--',
+                 label='Perfect Prediction', linewidth=2)
 
-        # Etiketler ve başlık
-        plt.xlabel('Experimental Values', fontsize=14, fontweight='bold')
-        plt.ylabel('Predicted Values', fontsize=14, fontweight='bold')
+        # Etiketler ve başlık - Font boyutları %20 artırıldı
+        plt.xlabel('Experimental Values', fontsize=17, fontweight='bold')
+        plt.ylabel('Predicted Values', fontsize=17, fontweight='bold')
         plt.title(f'{model_name} - Experimental vs Predicted Values\n'
                   f'(Scaling: {self.config.scaling_method})',
-                  fontsize=16,
-                  fontweight='bold',
-                  pad=20)
+                  fontsize=19, fontweight='bold', pad=20)
 
-        # Izgara çizgileri
-        plt.grid(True, linestyle='--', alpha=0.3)
-        plt.tick_params(axis='both', which='major', labelsize=12)
+        # Eksen değerleri boyutu artırıldı
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
 
-        # Metrik kutusu
+        # Metrikleri metin olarak ekle - Font boyutu artırıldı
         metrics_text = (
-            f'Cross-Validation Metrics (Mean):\n'
             f'R² = {avg_metrics["R²"]:.4f}\n'
             f'RMSE = {avg_metrics["RMSE"]:.4f}\n'
             f'MAE = {avg_metrics["MAE"]:.4f}\n'
             f'MAPE = {avg_metrics["MAPE"]:.2f}%'
         )
-
-        # Metrik kutusu stili
-        bbox_props = dict(
-            boxstyle='round,pad=0.5',
-            fc='white',
-            ec='gray',
-            alpha=0.9,
-            mutation_scale=0.5
-        )
-
-        # Metrikleri sağ üst köşeye yerleştir
-        plt.text(0.98, 0.98, metrics_text,
+        plt.text(0.95, 0.05, metrics_text,
                  transform=plt.gca().transAxes,
-                 verticalalignment='top',
+                 verticalalignment='bottom',
                  horizontalalignment='right',
-                 bbox=bbox_props,
-                 fontsize=12)
+                 fontsize=17,  # Metrik yazı boyutu artırıldı
+                 fontweight='bold',
+                 fontname='Arial',
+                 bbox=dict(boxstyle='round',
+                           facecolor='white',
+                           alpha=0.8,
+                           pad=0.8))  # Kutu padding'i artırıldı
 
-        # Legend'ı grafiğin dışına yerleştir
-        plt.legend(loc='center left',
-                   bbox_to_anchor=(1, 0.5),
-                   fontsize=12,
-                   frameon=True,
-                   facecolor='white',
-                   edgecolor='gray',
+        # Grafik özellikleri
+        plt.grid(True, linestyle='--', alpha=0.7)
+        plt.legend(fontsize=14, loc='upper left', frameon=True,
+                   facecolor='white', edgecolor='gray',
                    shadow=True)
-
-        # Grafik düzenini ayarla
         plt.tight_layout()
-        plt.subplots_adjust(right=0.85)
 
         # Grafiği kaydet
         if save_dir is not None:
             save_path = save_dir / f'{model_name.lower().replace(" ", "_")}_prediction_plot.png'
-            plt.savefig(save_path,
-                        dpi=300,
-                        bbox_inches='tight',
-                        facecolor='white',
-                        edgecolor='none')
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
             logger.info(f'Plot saved to {save_path}')
 
         plt.show()
