@@ -97,9 +97,7 @@ This project demonstrates the use of a Multilayer Perceptron (MLP) neural networ
 This project aims to predict wear loss under three different load conditions (30N, 20N, and 10N) using machine learning techniques. The MLP model is built using Keras, with dropout layers for regularization and early stopping to halt training when the validation loss stops improving.
 
 ### Key Features:
-- **MLP Architecture**: The model uses a feedforward neural network with five hidden layers.
-- **Early Stopping**: Training is halted when the validation loss does not improve after a specified number of epochs (patience).
-- **Dropout**: A dropout regularization technique is employed to prevent overfitting.
+The model employs a feedforward neural network where the number of hidden layers, nodes per layer, and hyperparameters were dynamically optimized through GridSearchCV. The architecture incorporates early stopping with optimized patience values to halt training when validation loss stagnates, and dropout regularization with tuned rates to prevent overfitting. Similarly, for Polynomial Regression, polynomial degrees were dynamically selected based on data characteristics and model performance metrics rather than using fixed values.
 
 ## Installation
 
