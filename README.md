@@ -5,13 +5,54 @@ Fatih Aydın¹²*, Kürşat Mustafa Karaoğlan³, Hatice Yakut Pektürk⁴, Bilg
 
 ## Overview
 
-This repository contains the code and methodologies used for the comparative evaluation of the wear behavior of epoxy matrix hybrid nano-composites. The study employs various machine learning models, including Deep Multi-Layer Perceptron, Random Forest, Gradient Boosting, Linear Regression, and Polynomial Regression, to predict wear loss accurately. The performance of these models is evaluated using metrics such as R², MAE, MSE, RMSE, and MAPE, aiming to optimize time and cost in tribological assessments.
+Predicting Wear Behavior of NCF-CFRP Composites using Machine Learning
+This repository presents a pioneering application of machine learning techniques for predicting the wear behavior of multiwall carbon nanotube (MWCNT) doped non-crimp fabric carbon fiber reinforced polymer (NCF-CFRP) composites. Our study introduces the first implementation of Deep Multi-Layer Perceptron (DMLP) modeling in this domain, marking a significant advancement in composite materials research.
+Key Findings
+
+Our DMLP model achieved superior predictive performance with R²=0.9726 in the testing phase
+1 wt% MWCNT reinforced composites demonstrated:
+
+48.1% reduction in wear loss under 10N load
+61.1% reduction in wear loss under 30N load
+for a sliding distance of 1000 m
+
+Implemented Models
+
+Deep Multi-Layer Perceptron (DMLP)
+Random Forest Regression
+Gradient Boosting Regression
+Linear Regression
+Polynomial Regression
+
+Model Evaluation Metrics
+
+R² (Coefficient of Determination)
+MAE (Mean Absolute Error)
+MSE (Mean Squared Error)
+RMSE (Root Mean Square Error)
+MAPE (Mean Absolute Percentage Error)
+
+Available Datasets
+The repository contains:
+
+Training dataset
+Testing dataset
+Model evaluation results
+
+Installation and Usage
+-Soon
+Contributing
+Please open an issue first to discuss what you would like to change before making any contributions.
+Contact
+kkaraoglan@karabuk.edu.tr
+Citation
+If you use this work in your research, please cite:
+Soon
 
 ## Study Summary
 
-This study aims to evaluate the wear behavior of multiwall carbon nanotube (MWCNT) doped non-crip fabric-carbon fiber reinforced polymer (NCF-CFRP) hybrid composites produced through vacuum infusion experiments and to model these experiments using Machine Learning (ML) techniques. Predicting wear behavior is crucial for understanding and optimizing complex tribological mechanisms. Due to the lengthy and costly nature of tribological testing, ML approaches are vital for predicting wear behavior and identifying system anomalies in advance.
-
-Various ML methods, including Deep Multi-Layer Perceptron, Random Forest Regression, Gradient Boosting, Linear Regression, and Polynomial Regression, were utilized to predict wear loss. All models achieved performance values above 92%, with the highest results from Linear Regression and Deep Multi-Layer Perceptron exceeding 99%. These models optimize the time and cost required for experimental studies while providing highly accurate predictions of wear characteristics, offering a new perspective on the tribological characterization of MWCNT-doped NCF-CFRP composites.
+This study evaluates the wear behavior of multiwall carbon nanotube (MWCNT) doped non-crimp fabric carbon fiber reinforced polymer (NCF-CFRP) hybrid composites produced through vacuum infusion and models these experiments using Machine Learning (ML) techniques. Compared to 0 wt% MWCNT reinforced composite, the wear loss of 1 wt% MWCNT reinforced composite under loads of 10N and 30N decreased by 48.1% and 61.1%, respectively, for sliding distance of 1000 m. Predicting wear behavior is crucial for understanding and optimizing complex tribological mechanisms. Due to the lengthy and costly nature of tribological testing, ML approaches are vital for predicting wear behavior and identifying system anomalies in advance.
+Various ML methods, including Deep Multi-Layer Perceptron (DMLP), Random Forest Regression (RFR), Gradient Boosting Regression (GBR), Linear Regression (LR), and Polynomial Regression (PR), were utilized to predict wear loss. The DMLP model exhibited enhanced predictive capabilities in the testing phase (R²=0.9726) compared to its training performance (R²=0.9531), while maintaining consistent performance across various load conditions. The LR model demonstrated stable performance characteristics between training (R²=0.9712) and testing (R²=0.9454) phases, though showing some performance degradation at higher loads. GBR and PR models showed perfect fit in training (R²=1.0000) but varied performance in testing, with PR exhibiting load-dependent prediction capabilities and GBR showing potential overfitting. These models optimize the time and cost required for experimental studies while providing accurate predictions of wear characteristics, offering a new perspective on the tribological characterization of MWCNT-doped NCF-CFRP composites.
 
 ## Dataset
 
