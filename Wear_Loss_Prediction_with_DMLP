@@ -426,15 +426,15 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
     print(f"Graphics successfully saved: {safe_target}")
 
 def process_dataset_with_gridsearch(file_name, target_column):
-    """GridSearchCV ile veri setini işle ve en iyi modeli döndür"""
+    
     try:
-        # Veriyi yükle ve kontrol et
+       
         print(f"\nLoading dataset from {file_name}...")
         df = pd.read_excel(file_name)
         if df.empty:
             raise ValueError("Dataset is empty")
 
-        # Features ve target ayır
+      
         feature_columns = [col for col in df.columns if col != target_column]
         if not feature_columns:
             raise ValueError("No feature columns found")
@@ -445,7 +445,7 @@ def process_dataset_with_gridsearch(file_name, target_column):
         X = df[feature_columns].values
         y = df[target_column].values
 
-        # NaN değer kontrolü
+       
         if np.isnan(X).any() or np.isnan(y).any():
             raise ValueError("Dataset contains NaN values")
 
@@ -461,7 +461,7 @@ def process_dataset_with_gridsearch(file_name, target_column):
             X_normalized, y_normalized, test_size=0.2, random_state=42, shuffle=True
         )
 
-        # Genişletilmiş parametre grid - CV değeri eklendi
+      
         param_grid = {
             'n_hidden_layers': [3, 5, 7, 10],
             'n_neurons': [8, 10, 12],
@@ -486,7 +486,7 @@ def process_dataset_with_gridsearch(file_name, target_column):
             current_param_grid = param_grid.copy()
             del current_param_grid['cv']
 
-            # GridSearchCV'yi ayarla
+    
             base_model = RPropMLPEstimator()
             grid_search = GridSearchCV(
                 estimator=base_model,
@@ -501,7 +501,7 @@ def process_dataset_with_gridsearch(file_name, target_column):
             print(f"\nTrying CV={cv_value}...")
             grid_search.fit(X_normalized, y_normalized)
 
-            # Eğer bu CV değeri daha iyi sonuç verdiyse, kaydet
+
             if grid_search.best_score_ > best_score:
                 best_score = grid_search.best_score_
                 best_cv = cv_value
@@ -513,24 +513,24 @@ def process_dataset_with_gridsearch(file_name, target_column):
         print("Best parameters:", best_params)
         print("Best cross-validation score:", -best_score)
 
-        # Early stopping epoch'unu bul
+       
         early_stopping_epoch = len(best_model.history['train_loss']) - best_params['patience']
 
-        # Training set tahminleri
+       
         y_train_pred = best_model.predict(X_train)
         y_train_true = y_train.reshape(-1, 1)
 
-        # Test set tahminleri
+       
         y_test_pred = best_model.predict(X_test)
         y_test_true = y_test.reshape(-1, 1)
 
-        # Tahminleri orijinal ölçeğe dönüştür
+      
         y_train_pred = scaler_y.inverse_transform(y_train_pred)
         y_train_true = scaler_y.inverse_transform(y_train_true)
         y_test_pred = scaler_y.inverse_transform(y_test_pred)
         y_test_true = scaler_y.inverse_transform(y_test_true)
 
-        # Metrikleri hesapla
+      
         metrics = {
             'train_r2': r2_score(y_train_true, y_train_pred),
             'test_r2': r2_score(y_test_true, y_test_pred),
@@ -547,8 +547,7 @@ def process_dataset_with_gridsearch(file_name, target_column):
             'best_cv': best_cv  # En iyi CV değerini de metriklere ekle
         }
 
-        # Excel dosyası işlemleri ve grafik oluşturma aynı şekilde devam eder...
-        # Sonuçları DataFrame'lere kaydet
+     
         train_results = pd.DataFrame({
             'Set': ['Train'] * len(y_train_true),
             'Actual_Values': y_train_true.ravel(),
@@ -561,13 +560,12 @@ def process_dataset_with_gridsearch(file_name, target_column):
             'Predicted_Values': y_test_pred.ravel()
         })
 
-        # Tüm sonuçları birleştir
+   
         all_results = pd.concat([train_results, test_results], ignore_index=True)
 
-        # Sonuçları Excel'e kaydet
         safe_target = target_column.replace(" ", "_").replace("(", "").replace(")", "")
         results_filename = f'prediction_results_{safe_target}.xlsx'
-        # Excel kaydetme kısmından sonra ve return'den önce şu şekilde değiştirin:
+    
         try:
             with pd.ExcelWriter(results_filename) as writer:
                 train_results.to_excel(writer, sheet_name='Training Results', index=False)
@@ -644,7 +642,6 @@ if __name__ == "__main__":
         params_df = pd.DataFrame()
 
         for target, results in all_results.items():
-            # Metrikleri düzenle
             metrics_data = pd.DataFrame({
                 'Metric': [
                     'Train R²', 'Test R²',
@@ -674,7 +671,6 @@ if __name__ == "__main__":
 
             params_df = pd.concat([params_df, params_data], axis=1)
 
-        # Tüm sonuçları tek bir Excel dosyasına kaydet
         with pd.ExcelWriter('final_results_summary.xlsx') as writer:
             metrics_df.to_excel(writer, sheet_name='All Metrics')
             params_df.to_excel(writer, sheet_name='Best Parameters')
