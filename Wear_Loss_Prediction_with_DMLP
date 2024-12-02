@@ -40,7 +40,6 @@ class RPropMLPEstimator(BaseEstimator, RegressorMixin):
         np.random.seed(random_state)
 
     def _initialize_weights(self, input_dim):
-        """Ağırlıkları başlat"""
         self.weights = []
         self.prev_gradients = []
         self.deltas = []
@@ -72,7 +71,6 @@ class RPropMLPEstimator(BaseEstimator, RegressorMixin):
         return X
 
     def _forward_pass(self, X, training=True):
-        """Forward pass with minimal dropout"""
         self.activations = [X]
         self.z_values = []
         self.dropout_masks = []
@@ -97,7 +95,6 @@ class RPropMLPEstimator(BaseEstimator, RegressorMixin):
         return output
 
     def _backward_pass(self, X, y, output):
-        """Geriye yayılım"""
         m = X.shape[0]
         gradients = []
 
@@ -113,11 +110,9 @@ class RPropMLPEstimator(BaseEstimator, RegressorMixin):
         return gradients
 
     def _calculate_loss(self, y_true, y_pred):
-        """Loss hesapla"""
         return np.mean(np.square(y_true.reshape(-1, 1) - y_pred))
 
     def _update_weights(self, gradients):
-        """RProp güncellemesi"""
         for i in range(len(self.weights)):
             sign = np.sign(gradients[i] * self.prev_gradients[i])
 
@@ -133,7 +128,6 @@ class RPropMLPEstimator(BaseEstimator, RegressorMixin):
             self.prev_gradients[i] = np.where(sign < 0, 0, gradients[i])
 
     def fit(self, X, y):
-        """Model eğitimi"""
         try:
             X_train, X_val, y_train, y_val = train_test_split(
                 X, y, test_size=0.2, random_state=self.random_state
@@ -176,7 +170,6 @@ class RPropMLPEstimator(BaseEstimator, RegressorMixin):
             raise
 
     def predict(self, X):
-        """Tahmin"""
         try:
             return self._forward_pass(X, training=False)
         except Exception as e:
@@ -184,10 +177,6 @@ class RPropMLPEstimator(BaseEstimator, RegressorMixin):
             raise
 
 def create_publication_quality_plots(best_model, target_column, metrics, early_stopping_epoch):
-    """
-    Bilimsel yayın kalitesinde DMLP grafikleri oluştur
-    """
-    # Matplotlib stil ayarları - Font boyutları artırıldı
     plt.style.use('default')
     plt.rcParams.update({
         'figure.facecolor': 'white',
@@ -210,12 +199,10 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
         'axes.spines.right': True
     })
 
-    # Dosya adı için güvenli string oluştur
     safe_target = target_column.replace(" ", "_").replace("(", "").replace(")", "")
 
     fig, ax = plt.subplots(figsize=(12, 10), dpi=300)
 
-    # Ana eğitim eğrileri - çizgi kalınlıkları ve opaklık artırıldı
     ax.plot(best_model.history['train_loss'],
             label='DMLP Training MSE',
             color='#2E86C1',  # Daha koyu mavi
@@ -230,7 +217,6 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
             alpha=0.9,  # Opaklık artırıldı
             zorder=3)
 
-    # Early stopping noktası - daha belirgin
     ax.axvline(x=early_stopping_epoch,
                color='#009988',
                linestyle='--',
@@ -239,7 +225,6 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                label=f'Early Stopping Point\n(Epoch {early_stopping_epoch})',
                zorder=2)
 
-    # Early stopping noktası işareti - daha büyük
     ax.scatter(early_stopping_epoch,
                best_model.history['val_loss'][early_stopping_epoch],
                color='#009988',
@@ -249,11 +234,9 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                linewidth=2.5,  # Kenar çizgisi kalınlığı artırıldı
                marker='o')  # Belirgin marker
 
-    # Bilimsel başlıklar ve etiketler - font boyutları artırıldı
     ax.set_xlabel('Training Epochs', fontsize=17, fontweight='bold')
     ax.set_ylabel('Mean Squared Error (MSE)', fontsize=17, fontweight='bold')
 
-    # Başlık ve alt başlık - font boyutları artırıldı
     title = f'DMLP Training Convergence Analysis\n{target_column}'
     subtitle = (f'$R^2_{{\mathrm{{train}}}}$ = {metrics["train_r2"]:.4f}, '
                 f'$R^2_{{\mathrm{{test}}}}$ = {metrics["test_r2"]:.4f}\n'
@@ -265,7 +248,6 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                  fontweight='bold',
                  pad=20)
 
-    # Eksen değerleri - daha büyük ve koyu
     ax.tick_params(axis='both',
                    labelsize=14,
                    width=2,  # Tick çizgilerinin kalınlığı
@@ -273,7 +255,6 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                    labelcolor='black',
                    colors='black')
 
-    # Izgara çizgileri - daha belirgin
     ax.grid(True,
             linestyle='--',
             alpha=0.4,  # Izgara opaklığı artırıldı
@@ -281,7 +262,6 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
             color='gray',
             zorder=1)
 
-    # Legend - daha belirgin ve şık
     ax.legend(loc='upper right',
               fontsize=14,
               frameon=True,
@@ -294,7 +274,6 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
               handlelength=3,  # Legend çizgi uzunluğu
               handletextpad=0.8)  # Çizgi ve metin arası boşluk
 
-    # Eksen çerçevesi kalınlığı
     for spine in ax.spines.values():
         spine.set_linewidth(1.5)
 
@@ -308,12 +287,9 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
 
     # 2. Actual vs Predicted Plot
     def create_publication_quality_plots(best_model, target_column, metrics, early_stopping_epoch):
-        # ... (önceki kodlar aynı kalır)
 
-        # 2. Actual vs Predicted Plot için güncellenmiş kod
         fig, ax = plt.subplots(figsize=(12, 10), dpi=300)
 
-        # Train verisi için scatter plot
         ax.scatter(metrics['y_train_true'],
                    metrics['y_train_pred'],
                    c='green',
@@ -323,7 +299,6 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                    label='Train Data',
                    zorder=3)
 
-        # Test verisi için scatter plot
         ax.scatter(metrics['y_test_true'],
                    metrics['y_test_pred'],
                    c='blue',
@@ -333,14 +308,12 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                    label='Test Data',
                    zorder=3)
 
-        # Mükemmel tahmin çizgisi için sınırları belirle
         max_val = max(np.max(metrics['y_train_true']), np.max(metrics['y_train_pred']),
                       np.max(metrics['y_test_true']), np.max(metrics['y_test_pred']))
         min_val = min(np.min(metrics['y_train_true']), np.min(metrics['y_train_pred']),
                       np.min(metrics['y_test_true']), np.min(metrics['y_test_pred']))
         padding = (max_val - min_val) * 0.1
 
-        # Mükemmel tahmin çizgisi
         ax.plot([min_val - padding, max_val + padding],
                 [min_val - padding, max_val + padding],
                 'k--',
@@ -348,20 +321,16 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                 label='Perfect Prediction',
                 zorder=2)
 
-        # Eksen etiketleri - Font boyutları artırıldı
         ax.set_xlabel('Experimental Values', fontsize=17, fontweight='bold')
         ax.set_ylabel('Predicted Values', fontsize=17, fontweight='bold')
 
-        # Başlık - Font boyutu artırıldı
         ax.set_title('DMLP - Experimental vs Predicted Values',
                      fontsize=19,
                      fontweight='bold',
                      pad=20)
 
-        # Eksen değerleri yazı boyutu artırıldı
         ax.tick_params(axis='both', labelsize=14)
 
-        # Metrikler kutusu - Font boyutu artırıldı
         metrics_text = (
             f'R² = {metrics["test_r2"]:.4f}\n'
             f'RMSE = {metrics["test_rmse"]:.4f}\n'
@@ -380,7 +349,6 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                           alpha=0.8,
                           pad=1.0))  # Padding artırıldı
 
-        # Izgara ve diğer stil düzenlemeleri
         ax.grid(True, linestyle='--', alpha=0.7, zorder=1)
         ax.legend(fontsize=14,
                   loc='upper left',
@@ -390,7 +358,6 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                   fancybox=True,
                   shadow=True)
 
-        # Eksen sınırları
         ax.set_xlim([min_val - padding, max_val + padding])
         ax.set_ylim([min_val - padding, max_val + padding])
         ax.set_aspect('equal')
@@ -403,7 +370,6 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                     edgecolor='none')
         plt.close()
 
-    # 3. Karşılaştırmalı Hata Analizi Grafiği
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8), dpi=300)  # Figure boyutu artırıldı
 
     # Box Plot
@@ -457,7 +423,7 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                 edgecolor='none')
     plt.close()
 
-    print(f"Grafikler başarıyla kaydedildi: {safe_target}")
+    print(f"Graphics successfully saved: {safe_target}")
 
 def process_dataset_with_gridsearch(file_name, target_column):
     """GridSearchCV ile veri setini işle ve en iyi modeli döndür"""
