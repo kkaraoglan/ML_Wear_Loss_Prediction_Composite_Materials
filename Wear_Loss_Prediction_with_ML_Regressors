@@ -248,13 +248,13 @@ def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series
                  transform=plt.gca().transAxes,
                  verticalalignment='bottom',
                  horizontalalignment='right',
-                 fontsize=17,  # Metrik yazı boyutu artırıldı
+                 fontsize=17, 
                  fontweight='bold',
                  fontname='Arial',
                  bbox=dict(boxstyle='round',
                            facecolor='white',
                            alpha=0.8,
-                           pad=0.8))  # Kutu padding'i artırıldı
+                           pad=0.8))  
 
         plt.grid(True, linestyle='--', alpha=0.7)
         plt.legend(fontsize=14, loc='upper left', frameon=True,
@@ -353,8 +353,8 @@ class DataProcessor:
 
             self._validate_data(df)
 
-            X = df.iloc[:, :4]  # First 4 columns are features
-            y = df.iloc[:, 4]  # 5th column is target
+            X = df.iloc[:, :4]  
+            y = df.iloc[:, 4]  
 
             self.feature_names = X.columns.tolist()
 
@@ -433,7 +433,6 @@ class ModelTrainer:
             is_polynomial: bool = False
     ) -> Dict[str, Dict[str, float]]:
         try:
-            # Transform features if polynomial
             if is_polynomial:
                 X_train_processed = self.poly.fit_transform(X_train)
                 X_test_processed = self.poly.transform(X_test)
@@ -538,10 +537,10 @@ class WearLossPredictor:
             plt.figure(figsize=(10, 8))
 
             plt.scatter(train_actual_all[:16], train_predictions_all[:16], c='green', alpha=0.7,
-                        label='Train Data', marker='o', s=100)  # s=100 ile nokta boyutu artırıldı
+                        label='Train Data', marker='o', s=100)  
 
             plt.scatter(test_actual_all[:4], test_predictions_all[:4], c='blue', alpha=0.7,
-                        label='Test Data', marker='x', s=100)  # s=100 ile nokta boyutu artırıldı
+                        label='Test Data', marker='x', s=100) 
 
             min_val = min(train_actual_all.min(), train_predictions_all.min(),
                           test_actual_all.min(), test_predictions_all.min())
@@ -565,8 +564,8 @@ class WearLossPredictor:
                      verticalalignment='bottom',
                      horizontalalignment='right',
                      fontsize=14,
-                     fontweight='bold',  # Kalın yazı tipi
-                     fontname='Arial',  # Yazı tipini Arial olarak belirledik
+                     fontweight='bold',  
+                     fontname='Arial',  
                      bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
 
             plt.grid(True, linestyle='--', alpha=0.7)
@@ -593,7 +592,7 @@ class WearLossPredictor:
         try:
             X, y = self.data_processor.load_and_preprocess(file_path)
             save_dir = Path("results")
-            file_name = file_path.stem  # Gets filename without extension
+            file_name = file_path.stem 
             plots_dir = save_dir / f"{file_name}_plots"
             plots_dir.mkdir(parents=True, exist_ok=True)
 
@@ -613,7 +612,7 @@ class WearLossPredictor:
                 self.config = ModelConfig(
                     n_splits=self.config.n_splits,
                     random_state=self.config.random_state,
-                    polynomial_degree=best_degree,  # Update polynomial degree
+                    polynomial_degree=best_degree,  
                     scaling_method=self.config.scaling_method,
                     validation_size=self.config.validation_size,
                     early_stopping_rounds=self.config.early_stopping_rounds,
@@ -811,7 +810,6 @@ def main():
         print(f"\nError occurred: {str(e)}")
         raise
     finally:
-        # Remove file handler to avoid duplicate logs
         logger.removeHandler(file_handler)
         file_handler.close()
 
