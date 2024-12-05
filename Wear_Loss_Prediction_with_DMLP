@@ -201,34 +201,34 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
 
     ax.plot(best_model.history['train_loss'],
             label='DMLP Training MSE',
-            color='#2E86C1',  # Daha koyu mavi
-            linewidth=3.5,  # Çizgi kalınlığı artırıldı
-            alpha=0.9,  # Opaklık artırıldı
+            color='#2E86C1',  
+            linewidth=3.5,  
+            alpha=0.9,  
             zorder=3)
 
     ax.plot(best_model.history['val_loss'],
             label='DMLP Validation MSE',
-            color='#E74C3C',  # Daha koyu kırmızı
-            linewidth=3.5,  # Çizgi kalınlığı artırıldı
-            alpha=0.9,  # Opaklık artırıldı
+            color='#E74C3C',  
+            linewidth=3.5,  
+            alpha=0.9,  
             zorder=3)
 
     ax.axvline(x=early_stopping_epoch,
                color='#009988',
                linestyle='--',
-               linewidth=2.5,  # Çizgi kalınlığı artırıldı
-               alpha=0.8,  # Opaklık artırıldı
+               linewidth=2.5,  
+               alpha=0.8,  
                label=f'Early Stopping Point\n(Epoch {early_stopping_epoch})',
                zorder=2)
 
     ax.scatter(early_stopping_epoch,
                best_model.history['val_loss'][early_stopping_epoch],
                color='#009988',
-               s=200,  # Nokta boyutu artırıldı
+               s=200,  
                zorder=4,
                edgecolor='white',
-               linewidth=2.5,  # Kenar çizgisi kalınlığı artırıldı
-               marker='o')  # Belirgin marker
+               linewidth=2.5,  
+               marker='o')  
 
     ax.set_xlabel('Training Epochs', fontsize=17, fontweight='bold')
     ax.set_ylabel('Mean Squared Error (MSE)', fontsize=17, fontweight='bold')
@@ -246,15 +246,15 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
 
     ax.tick_params(axis='both',
                    labelsize=14,
-                   width=2,  # Tick çizgilerinin kalınlığı
-                   length=6,  # Tick çizgilerinin uzunluğu
+                   width=2,  
+                   length=6,  
                    labelcolor='black',
                    colors='black')
 
     ax.grid(True,
             linestyle='--',
-            alpha=0.4,  # Izgara opaklığı artırıldı
-            linewidth=1.2,  # Izgara çizgi kalınlığı
+            alpha=0.4,  
+            linewidth=1.2,  
             color='gray',
             zorder=1)
 
@@ -265,10 +265,10 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
               framealpha=0.95,
               edgecolor='gray',
               shadow=True,
-              borderpad=1,  # İç padding
-              labelspacing=1.2,  # Etiketler arası boşluk
-              handlelength=3,  # Legend çizgi uzunluğu
-              handletextpad=0.8)  # Çizgi ve metin arası boşluk
+              borderpad=1,  
+              labelspacing=1.2,  
+              handlelength=3,  
+              handletextpad=0.8)  
 
     for spine in ax.spines.values():
         spine.set_linewidth(1.5)
@@ -281,7 +281,6 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                 edgecolor='none')
     plt.close()
 
-    # 2. Actual vs Predicted Plot
     def create_publication_quality_plots(best_model, target_column, metrics, early_stopping_epoch):
         fig, ax = plt.subplots(figsize=(12, 10), dpi=300)
 
@@ -289,7 +288,7 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                    metrics['y_train_pred'],
                    c='green',
                    alpha=0.7,
-                   s=120,  # Nokta boyutu
+                   s=120, 
                    marker='o',
                    label='Train Data',
                    zorder=3)
@@ -298,7 +297,7 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                    metrics['y_test_pred'],
                    c='blue',
                    alpha=0.7,
-                   s=120,  # Nokta boyutu
+                   s=120, 
                    marker='x',
                    label='Test Data',
                    zorder=3)
@@ -342,12 +341,12 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                 bbox=dict(boxstyle='round',
                           facecolor='white',
                           alpha=0.8,
-                          pad=1.0))  # Padding artırıldı
+                          pad=1.0))  
 
         ax.grid(True, linestyle='--', alpha=0.7, zorder=1)
         ax.legend(fontsize=14,
                   loc='upper left',
-                  frameon=True,  # Frame görünürlüğü açıldı
+                  frameon=True,  
                   framealpha=0.9,
                   edgecolor='gray',
                   fancybox=True,
@@ -365,7 +364,7 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                     edgecolor='none')
         plt.close()
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8), dpi=300)  # Figure boyutu artırıldı
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8), dpi=300)  
 
     train_errors = metrics['y_train_pred'].ravel() - metrics['y_train_true'].ravel()
     test_errors = metrics['y_test_pred'].ravel() - metrics['y_test_true'].ravel()
@@ -382,7 +381,7 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                   fontsize=19,  # 14 -> 19
                   fontweight='bold',
                   pad=20)
-    ax1.tick_params(axis='both', labelsize=14)  # Eksen değerleri yazı boyutu artırıldı
+    ax1.tick_params(axis='both', labelsize=14)  
     ax1.grid(True, linestyle='--', alpha=0.3)
     ax1.axhline(y=0, color='k', linestyle='--', alpha=0.3)
 
@@ -403,10 +402,10 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                   fontsize=19,  # 14 -> 19
                   fontweight='bold',
                   pad=20)
-    ax2.tick_params(axis='both', labelsize=14)  # Eksen değerleri yazı boyutu artırıldı
+    ax2.tick_params(axis='both', labelsize=14)  
     ax2.grid(True, linestyle='--', alpha=0.3)
     ax2.axvline(x=0, color='k', linestyle='--', alpha=0.3)
-    ax2.legend(fontsize=14)  # Legend yazı boyutu artırıldı
+    ax2.legend(fontsize=14) 
 
     plt.tight_layout()
     plt.savefig(f'DMLP_error_analysis_{safe_target}.png',
@@ -521,7 +520,7 @@ def process_dataset_with_gridsearch(file_name, target_column):
             'y_train_pred': y_train_pred,
             'y_test_true': y_test_true,
             'y_test_pred': y_test_pred,
-            'best_cv': best_cv  # En iyi CV değerini de metriklere ekle
+            'best_cv': best_cv  
         }
         train_results = pd.DataFrame({
             'Set': ['Train'] * len(y_train_true),
@@ -612,7 +611,6 @@ if __name__ == "__main__":
         params_df = pd.DataFrame()
 
         for target, results in all_results.items():
-            # Metrikleri düzenle
             metrics_data = pd.DataFrame({
                 'Metric': [
                     'Train R²', 'Test R²',
