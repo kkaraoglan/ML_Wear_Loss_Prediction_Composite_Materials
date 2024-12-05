@@ -38,7 +38,6 @@ class PolynomialRegressionOptimizer:
         self.detailed_metrics = {}
 
     def optimize(self, X: pd.DataFrame, y: pd.Series):
-        """Find optimal polynomial degree using cross-validation"""
         kf = KFold(n_splits=self.n_splits, shuffle=True, random_state=self.random_state)
 
         for degree in range(self.min_degree, self.max_degree + 1):
@@ -86,15 +85,12 @@ class PolynomialRegressionOptimizer:
 
     def plot_degree_scores(self, save_dir: Optional[Path] = None):
         """
-        Plot R² scores and other metrics for different polynomial degrees
-
         Parameters:
         save_dir (Path, optional): Directory to save the plots
         """
         degrees = list(self.scores.keys())
         scores = list(self.scores.values())
 
-        # Create figure with two subplots
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
 
         # R² scores plot
@@ -121,21 +117,15 @@ class PolynomialRegressionOptimizer:
 
         plt.tight_layout()
 
-        # Save plots if save_dir is provided
         if save_dir is not None:
-            # Create plots directory if it doesn't exist
             save_dir = Path(save_dir)
             save_dir.mkdir(parents=True, exist_ok=True)
 
-            # Save combined plot
             combined_plot_path = save_dir / f'polynomial_optimization_combined.png'
             plt.savefig(combined_plot_path, dpi=300, bbox_inches='tight')
             logger.info(f'Combined plot saved to {combined_plot_path}')
 
-            # Save individual plots
             plt.figure(figsize=(8, 6))
-
-            # Save R² plot
             plt.plot(degrees, scores, 'bo-')
             plt.axvline(x=self.best_degree, color='r', linestyle='--',
                         label=f'Best Degree = {self.best_degree}')
@@ -149,7 +139,6 @@ class PolynomialRegressionOptimizer:
             logger.info(f'R² plot saved to {r2_plot_path}')
             plt.close()
 
-            # Save Error metrics plot
             plt.figure(figsize=(8, 6))
             plt.plot(degrees, rmse_scores, 'ro-', label='RMSE')
             plt.plot(degrees, mae_scores, 'go-', label='MAE')
@@ -163,11 +152,9 @@ class PolynomialRegressionOptimizer:
             logger.info(f'Error metrics plot saved to {error_plot_path}')
             plt.close()
 
-        # Show the combined plot
         plt.show()
         plt.close()
 
-        # Print detailed metrics
         print(f"\nBest Polynomial Degree: {self.best_degree}")
         print("\nDetailed metrics for each degree:")
         for degree in degrees:
@@ -181,27 +168,22 @@ class PolynomialRegressionOptimizer:
 def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series,
                             save_dir: Optional[Path] = None) -> None:
     try:
-        # Tüm tahminleri ve gerçek değerleri saklamak için diziler
         all_predictions = np.array([])
         all_actual = np.array([])
 
-        # KFold kullan
         kf = KFold(n_splits=self.config.n_splits, shuffle=True, random_state=self.config.random_state)
         fold_metrics = []
 
-        # Grafik için eğitim ve test noktalarını saklamak
         train_actual_all = np.array([])
         train_predictions_all = np.array([])
 
         test_actual_all = np.array([])
         test_predictions_all = np.array([])
 
-        # Her fold için model eğit ve tahmin yap
         for train_idx, test_idx in kf.split(X):
             X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
             y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
-            # Model ve veri hazırlığı
             model, is_poly = self.models[model_name]
             if isinstance(model, LinearRegression):
                 current_model = LinearRegression()
@@ -210,7 +192,6 @@ def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series
             elif isinstance(model, RandomForestRegressor):
                 current_model = RandomForestRegressor(**self.config.rf_params)
 
-            # Polynomial dönüşüm
             if is_poly:
                 X_train_processed = self.model_trainer.poly.fit_transform(X_train)
                 X_test_processed = self.model_trainer.poly.transform(X_test)
@@ -218,46 +199,36 @@ def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series
                 X_train_processed = X_train
                 X_test_processed = X_test
 
-            # Model eğitimi ve tahminler
             current_model.fit(X_train_processed, y_train)
 
-            # Test tahminleri
             y_test_pred = current_model.predict(X_test_processed)
             test_predictions_all = np.append(test_predictions_all, y_test_pred)
             test_actual_all = np.append(test_actual_all, y_test)
 
-            # Eğitim tahminleri
             y_train_pred = current_model.predict(X_train_processed)
             train_predictions_all = np.append(train_predictions_all, y_train_pred)
             train_actual_all = np.append(train_actual_all, y_train)
 
-            # Metrikleri hesapla
             metrics = MetricsCalculator.calculate_metrics(y_test, y_test_pred)
             fold_metrics.append(metrics)
 
-        # Ortalama metrikleri hesapla
         avg_metrics = {
             metric: np.mean([m[metric] for m in fold_metrics])
             for metric in fold_metrics[0].keys()
         }
 
-        # Grafik çizimi - Boyutlar %20 artırıldı
         plt.figure(figsize=(12, 10))  # Figure boyutu artırıldı
 
-        # Font boyutlarını artır
         plt.rcParams.update({'font.size': 14})  # Genel font boyutu artışı
 
-        # Eğitim verilerini göster (nokta boyutu artırıldı)
         plt.scatter(train_actual_all[:16], train_predictions_all[:16],
                     c='green', alpha=0.7,
                     label='Train Data', marker='o', s=120)
 
-        # Test verilerini göster (nokta boyutu artırıldı)
         plt.scatter(test_actual_all[:4], test_predictions_all[:4],
                     c='blue', alpha=0.7,
                     label='Test Data', marker='x', s=120)
 
-        # Mükemmel tahmin çizgisi
         min_val = min(train_actual_all.min(), train_predictions_all.min(),
                       test_actual_all.min(), test_predictions_all.min())
         max_val = max(train_actual_all.max(), train_predictions_all.max(),
@@ -265,18 +236,15 @@ def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series
         plt.plot([min_val, max_val], [min_val, max_val], 'k--',
                  label='Perfect Prediction', linewidth=2)
 
-        # Etiketler ve başlık - Font boyutları %20 artırıldı
         plt.xlabel('Experimental Values', fontsize=17, fontweight='bold')
         plt.ylabel('Predicted Values', fontsize=17, fontweight='bold')
         plt.title(f'{model_name} - Experimental vs Predicted Values\n'
                   f'(Scaling: {self.config.scaling_method})',
                   fontsize=19, fontweight='bold', pad=20)
 
-        # Eksen değerleri boyutu artırıldı
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
 
-        # Metrikleri metin olarak ekle - Font boyutu artırıldı
         metrics_text = (
             f'R² = {avg_metrics["R²"]:.4f}\n'
             f'RMSE = {avg_metrics["RMSE"]:.4f}\n'
@@ -295,14 +263,12 @@ def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series
                            alpha=0.8,
                            pad=0.8))  # Kutu padding'i artırıldı
 
-        # Grafik özellikleri
         plt.grid(True, linestyle='--', alpha=0.7)
         plt.legend(fontsize=14, loc='upper left', frameon=True,
                    facecolor='white', edgecolor='gray',
                    shadow=True)
         plt.tight_layout()
 
-        # Grafiği kaydet
         if save_dir is not None:
             save_path = save_dir / f'{model_name.lower().replace(" ", "_")}_prediction_plot.png'
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -316,12 +282,10 @@ def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series
         raise
 
 def plot_all_models(self, X: pd.DataFrame, y: pd.Series, save_dir: Optional[Path] = None) -> None:
-    """Plot predictions for all models"""
     for model_name in self.models.keys():
         self.plot_prediction_results(model_name, X, y, save_dir=save_dir)
 
 class ScalingMethod(Enum):
-    """Scaling methods enumeration"""
     NONE = "none"
     STANDARD = "standard"
     MINMAX = "minmax"
@@ -332,7 +296,6 @@ class ScalingMethod(Enum):
 
 @dataclass(frozen=True)
 class ModelConfig:
-    """Immutable model configuration"""
     n_splits: int
     random_state: int
     polynomial_degree: int
@@ -343,7 +306,6 @@ class ModelConfig:
     rf_params: Dict[str, Any]
 
     def __post_init__(self):
-        """Validate configuration parameters"""
         if not isinstance(self.n_splits, int) or self.n_splits < 2:
             raise ValueError("n_splits must be an integer >= 2")
         if not isinstance(self.random_state, int):
@@ -357,17 +319,13 @@ class ModelConfig:
 
 
 class MetricsCalculator:
-    """Calculate and validate model metrics"""
-
     @staticmethod
     def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
-        """Calculate regression metrics with validation"""
         if len(y_true) != len(y_pred):
             raise ValueError("Length mismatch between y_true and y_pred")
         if np.any(np.isnan(y_true)) or np.any(np.isnan(y_pred)):
             raise ValueError("Input contains NaN values")
 
-        # Avoid division by zero in MAPE calculation
         mape = np.mean(np.abs((y_true - y_pred) / np.maximum(1e-10, np.abs(y_true)))) * 100
 
         return {
@@ -379,8 +337,6 @@ class MetricsCalculator:
 
 
 class DataProcessor:
-    """Handle data loading and preprocessing"""
-
     def __init__(self, scaling_method: ScalingMethod):
         self.scaling_method = scaling_method
         self.scaler = self._get_scaler()
@@ -388,7 +344,6 @@ class DataProcessor:
         self._is_fitted = False
 
     def _get_scaler(self) -> Optional[BaseEstimator]:
-        """Get appropriate scaler based on scaling method"""
         if self.scaling_method == ScalingMethod.STANDARD:
             return StandardScaler()
         elif self.scaling_method == ScalingMethod.MINMAX:
@@ -396,7 +351,6 @@ class DataProcessor:
         return None
 
     def load_and_preprocess(self, file_path: Path) -> Tuple[pd.DataFrame, pd.Series]:
-        """Load and preprocess data with comprehensive validation"""
         try:
             if not file_path.exists():
                 raise FileNotFoundError(f"File not found: {file_path}")
@@ -404,17 +358,12 @@ class DataProcessor:
             logger.info(f"Loading data from {file_path}")
             df = pd.read_excel(file_path)
 
-            # Validate data structure
             self._validate_data(df)
 
-            # Split features and target
             X = df.iloc[:, :4]  # First 4 columns are features
             y = df.iloc[:, 4]  # 5th column is target
 
-            # Store feature names
             self.feature_names = X.columns.tolist()
-
-            # Apply scaling if needed
             X_processed = self._scale_features(X)
 
             logger.info("Data preprocessing completed successfully")
@@ -425,7 +374,6 @@ class DataProcessor:
             raise
 
     def _validate_data(self, df: pd.DataFrame) -> None:
-        """Comprehensive data validation"""
         if df.empty:
             raise ValueError("Empty dataset")
 
@@ -445,7 +393,6 @@ class DataProcessor:
             raise ValueError(f"Zero variance detected in columns: {zero_var_cols}")
 
     def _scale_features(self, X: pd.DataFrame) -> pd.DataFrame:
-        """Scale features if scaling is enabled"""
         if self.scaler is None:
             return X.copy()
 
@@ -464,7 +411,6 @@ class DataProcessor:
                     index=X.index
                 )
 
-            # Validate scaled output
             if X_scaled.isnull().any().any():
                 raise ValueError("Scaling produced NaN values")
 
@@ -476,8 +422,6 @@ class DataProcessor:
 
 
 class ModelTrainer:
-    """Handle model training and evaluation"""
-
     def __init__(self, config: ModelConfig):
         self.config = config
         self.poly = PolynomialFeatures(
@@ -494,7 +438,6 @@ class ModelTrainer:
             y_test: pd.Series,
             is_polynomial: bool = False
     ) -> Dict[str, Dict[str, float]]:
-        """Train and evaluate a model with proper validation"""
         try:
             # Transform features if polynomial
             if is_polynomial:
@@ -504,17 +447,13 @@ class ModelTrainer:
                 X_train_processed = X_train
                 X_test_processed = X_test
 
-            # Validate transformed data
             self._validate_transformed_data(X_train_processed, X_test_processed)
 
-            # Train model
             model.fit(X_train_processed, y_train)
 
-            # Generate predictions
             y_train_pred = model.predict(X_train_processed)
             y_test_pred = model.predict(X_test_processed)
 
-            # Calculate metrics
             train_metrics = MetricsCalculator.calculate_metrics(y_train, y_train_pred)
             test_metrics = MetricsCalculator.calculate_metrics(y_test, y_test_pred)
 
@@ -528,7 +467,6 @@ class ModelTrainer:
             raise
 
     def _validate_transformed_data(self, X_train: np.ndarray, X_test: np.ndarray) -> None:
-        """Validate transformed feature data"""
         if np.any(np.isnan(X_train)) or np.any(np.isnan(X_test)):
             raise ValueError("NaN values detected in transformed features")
         if np.any(np.isinf(X_train)) or np.any(np.isinf(X_test)):
@@ -536,8 +474,6 @@ class ModelTrainer:
 
 
 class WearLossPredictor:
-    """Main class for wear loss prediction"""
-
     def __init__(self, config: ModelConfig):
         self.config = config
         self.data_processor = DataProcessor(config.scaling_method)
@@ -546,7 +482,6 @@ class WearLossPredictor:
         self.results: Dict[str, Dict] = {}
 
     def _initialize_models(self) -> Dict[str, Tuple[BaseEstimator, bool]]:
-        """Initialize models with configuration"""
         return {
             'Linear Regression': (LinearRegression(), False),
             'Polynomial Regression': (LinearRegression(), True),
@@ -557,27 +492,22 @@ class WearLossPredictor:
     def plot_prediction_results(self, model_name: str, X: pd.DataFrame, y: pd.Series,
                                 save_dir: Optional[Path] = None) -> None:
         try:
-            # Tüm tahminleri ve gerçek değerleri saklamak için diziler
             all_predictions = np.array([])
             all_actual = np.array([])
 
-            # KFold kullan
             kf = KFold(n_splits=self.config.n_splits, shuffle=True, random_state=self.config.random_state)
             fold_metrics = []
 
-            # Grafik için eğitim ve test noktalarını saklamak
             train_actual_all = np.array([])
             train_predictions_all = np.array([])
 
             test_actual_all = np.array([])
             test_predictions_all = np.array([])
 
-            # Her fold için model eğit ve tahmin yap
             for train_idx, test_idx in kf.split(X):
                 X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
                 y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
-                # Yeni model instance'ı oluştur
                 model, is_poly = self.models[model_name]
                 if isinstance(model, LinearRegression):
                     current_model = LinearRegression()
@@ -586,7 +516,6 @@ class WearLossPredictor:
                 elif isinstance(model, RandomForestRegressor):
                     current_model = RandomForestRegressor(**self.config.rf_params)
 
-                # Polynomial dönüşüm gerekiyorsa uygula
                 if is_poly:
                     X_train_processed = self.model_trainer.poly.fit_transform(X_train)
                     X_test_processed = self.model_trainer.poly.transform(X_test)
@@ -594,54 +523,43 @@ class WearLossPredictor:
                     X_train_processed = X_train
                     X_test_processed = X_test
 
-                # Model eğitimi ve tahminler
                 current_model.fit(X_train_processed, y_train)
 
-                # Test tahminleri ve gerçek değerleri
                 y_test_pred = current_model.predict(X_test_processed)
                 test_predictions_all = np.append(test_predictions_all, y_test_pred)
                 test_actual_all = np.append(test_actual_all, y_test)
 
-                # Eğitim tahminleri ve gerçek değerleri
                 y_train_pred = current_model.predict(X_train_processed)
                 train_predictions_all = np.append(train_predictions_all, y_train_pred)
                 train_actual_all = np.append(train_actual_all, y_train)
 
-                # Metrikleri hesapla
                 metrics = MetricsCalculator.calculate_metrics(y_test, y_test_pred)
                 fold_metrics.append(metrics)
 
-            # Ortalama metrikleri hesapla
             avg_metrics = {
                 metric: np.mean([m[metric] for m in fold_metrics])
                 for metric in fold_metrics[0].keys()
             }
 
-            # Grafik çizimi
             plt.figure(figsize=(10, 8))
 
-            # Eğitim verilerini farklı renk ve sembolle göster (nokta boyutu artırıldı)
             plt.scatter(train_actual_all[:16], train_predictions_all[:16], c='green', alpha=0.7,
                         label='Train Data', marker='o', s=100)  # s=100 ile nokta boyutu artırıldı
 
-            # Test verilerini farklı renk ve sembolle göster (nokta boyutu artırıldı)
             plt.scatter(test_actual_all[:4], test_predictions_all[:4], c='blue', alpha=0.7,
                         label='Test Data', marker='x', s=100)  # s=100 ile nokta boyutu artırıldı
 
-            # Mükemmel tahmin çizgisi
             min_val = min(train_actual_all.min(), train_predictions_all.min(),
                           test_actual_all.min(), test_predictions_all.min())
             max_val = max(train_actual_all.max(), train_predictions_all.max(),
                           test_actual_all.max(), test_predictions_all.max())
             plt.plot([min_val, max_val], [min_val, max_val], 'k--', label='Perfect Prediction')
 
-            # Etiketler ve başlık
             plt.xlabel('Experimental Values', fontsize=14, fontweight='bold')
             plt.ylabel('Predicted Values', fontsize=14, fontweight='bold')
             plt.title(f'{model_name} - Experimental vs Predicted Values\n'
                       f'(Scaling: {self.config.scaling_method})', fontsize=16, fontweight='bold')
 
-            # Metrikleri metin olarak sağ alt köşeye ekle (şık ve bold yazılar)
             metrics_text = (
                 f'R² = {avg_metrics["R²"]:.4f}\n'
                 f'RMSE = {avg_metrics["RMSE"]:.4f}\n'
@@ -657,12 +575,10 @@ class WearLossPredictor:
                      fontname='Arial',  # Yazı tipini Arial olarak belirledik
                      bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
 
-            # Grafik özellikleri
             plt.grid(True, linestyle='--', alpha=0.7)
             plt.legend(fontsize=12, loc='upper left', frameon=False)
             plt.tight_layout()
 
-            # Grafiği kaydet
             if save_dir is not None:
                 save_path = save_dir / f'{model_name.lower().replace(" ", "_")}_prediction_plot.png'
                 plt.savefig(save_path, dpi=300, bbox_inches='tight')
@@ -676,21 +592,17 @@ class WearLossPredictor:
             raise
 
     def plot_all_models(self, X: pd.DataFrame, y: pd.Series, save_dir: Optional[Path] = None) -> None:
-        """Plot predictions for all models"""
         for model_name in self.models.keys():
             self.plot_prediction_results(model_name, X, y, save_dir=save_dir)
 
     def run_analysis(self, file_path: Path) -> pd.DataFrame:
-        """Run complete analysis pipeline"""
         try:
-            # Load and preprocess data
             X, y = self.data_processor.load_and_preprocess(file_path)
             save_dir = Path("results")
             file_name = file_path.stem  # Gets filename without extension
             plots_dir = save_dir / f"{file_name}_plots"
             plots_dir.mkdir(parents=True, exist_ok=True)
 
-            # Optimize polynomial degree if Polynomial Regression is used
             if any(model_name == 'Polynomial Regression' for model_name in self.models.keys()):
                 logger.info("Optimizing polynomial regression degree...")
                 optimizer = PolynomialRegressionOptimizer(
@@ -701,11 +613,9 @@ class WearLossPredictor:
                 )
                 best_degree, detailed_metrics = optimizer.optimize(X, y)
 
-                # plots_dir'i plots_dir/polynomial_optimization olarak güncelleyin
                 poly_plots_dir = plots_dir / 'polynomial_optimization'
                 optimizer.plot_degree_scores(save_dir=poly_plots_dir)
 
-                # Update config with optimal degree
                 self.config = ModelConfig(
                     n_splits=self.config.n_splits,
                     random_state=self.config.random_state,
@@ -717,20 +627,16 @@ class WearLossPredictor:
                     rf_params=self.config.rf_params
                 )
 
-                # Reinitialize model trainer with new config
                 self.model_trainer = ModelTrainer(self.config)
 
-            # Initialize cross-validation
             kf = KFold(
                 n_splits=self.config.n_splits,
                 shuffle=True,
                 random_state=self.config.random_state
             )
 
-            # Store results for each model
             model_results = []
 
-            # Evaluate each model
             for model_name, (model, is_polynomial) in self.models.items():
                 logger.info(f"Evaluating {model_name}")
                 fold_results = self._evaluate_model(model, is_polynomial, X, y, kf)
@@ -739,7 +645,6 @@ class WearLossPredictor:
                     **self._format_results(fold_results)
                 })
 
-            # Convert results to DataFrame
             results_df = pd.DataFrame(model_results)
             self.results[str(self.config.scaling_method)] = results_df
 
@@ -757,17 +662,14 @@ class WearLossPredictor:
             y: pd.Series,
             kf: KFold
     ) -> List[Dict[str, Dict[str, float]]]:
-        """Evaluate a single model using cross-validation"""
         fold_results = []
 
         for fold, (train_idx, test_idx) in enumerate(kf.split(X), 1):
             logger.info(f"Processing fold {fold}/{self.config.n_splits}")
 
-            # Split data
             X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
             y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
-            # Create fresh model instance
             if isinstance(model, LinearRegression):
                 model_instance = LinearRegression()
             elif isinstance(model, GradientBoostingRegressor):
@@ -775,7 +677,6 @@ class WearLossPredictor:
             elif isinstance(model, RandomForestRegressor):
                 model_instance = RandomForestRegressor(**self.config.rf_params)
 
-            # Train and evaluate
             fold_metrics = self.model_trainer.train_and_evaluate(
                 model_instance, X_train, X_test, y_train, y_test, is_polynomial
             )
@@ -784,7 +685,6 @@ class WearLossPredictor:
         return fold_results
 
     def _format_results(self, fold_results: List[Dict[str, Dict[str, float]]]) -> Dict[str, str]:
-        """Format results with mean and standard deviation"""
         formatted_results = {}
 
         for split in ['train', 'test']:
@@ -798,19 +698,15 @@ class WearLossPredictor:
 
 
 def main():
-    """Main execution function with error handling"""
     try:
-        # Setup paths
         fileName = "Dataset_WearLoss_30N"
         file_path = Path(fileName + ".xlsx")
         output_dir = Path("results")
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create plots directory
         plots_dir = output_dir / f"{fileName}_plots"
         plots_dir.mkdir(exist_ok=True)
 
-        # Configure logging for file
         file_handler = logging.FileHandler(output_dir / f"{fileName}_analysis.log")
         file_handler.setFormatter(logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -819,7 +715,6 @@ def main():
 
         logger.info("Starting wear loss analysis")
 
-        # Default configuration
         config = ModelConfig(
             n_splits=3,
             random_state=42,
@@ -843,31 +738,25 @@ def main():
             }
         )
 
-        # Initialize predictor and run analysis
         predictor = WearLossPredictor(config)
         logger.info("Running analysis with standard scaling")
         results = predictor.run_analysis(file_path)
 
-        # Load data for plotting
         X, y = predictor.data_processor.load_and_preprocess(file_path)
 
-        # Generate and save plots
         logger.info("Generating prediction plots")
         predictor.plot_all_models(X, y, save_dir=plots_dir)
 
-        # Save results to CSV
         results_file = Path(output_dir) / f"{fileName}_model_results.csv"
         results.to_csv(results_file, index=False)
         logger.info(f"Results saved to {results_file}")
 
-        # Save results to Excel with formatting
         excel_file = output_dir / f"{fileName}_model_results.xlsx"
         with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
             results.to_excel(writer, index=False, sheet_name='Results')
             workbook = writer.book
             worksheet = writer.sheets['Results']
 
-            # Apply formatting
             for column in worksheet.columns:
                 max_length = 0
                 column = list(column)
@@ -882,13 +771,11 @@ def main():
 
         logger.info(f"Formatted results saved to {excel_file}")
 
-        # Display results
         print("\nModel Evaluation Results:")
         print("=" * 100)
         print(results.to_string(index=False))
         print("\nAnalysis completed successfully!")
 
-        # Optional: Run additional scaling methods comparison
         if input("\nWould you like to compare different scaling methods? (y/n): ").lower() == 'y':
             scaling_results = {}
 
@@ -908,13 +795,11 @@ def main():
                 predictor = WearLossPredictor(config)
                 scaling_results[scaling_method.value] = predictor.run_analysis(file_path)
 
-                # Generate plots for each scaling method
                 X, y = predictor.data_processor.load_and_preprocess(file_path)
                 scaling_plots_dir = plots_dir / f"scaling_{scaling_method.value}"
                 scaling_plots_dir.mkdir(exist_ok=True)
                 predictor.plot_all_models(X, y, save_dir=scaling_plots_dir)
 
-            # Save comparative results
             comparative_dir = output_dir / f"{fileName}_scaling_comparison"
             comparative_dir.mkdir(exist_ok=True)
 
