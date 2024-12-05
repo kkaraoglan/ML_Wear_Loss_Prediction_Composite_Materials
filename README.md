@@ -61,11 +61,11 @@ Various ML methods, including Deep Multi-Layer Perceptron (DMLP), Random Forest 
 
 ## Dataset
 
-The datasets used in this study will be made publicly available upon publication of the manuscript.
+Datasets are shared both in the manuscript and in this repo. They cannot be used without reference.
 
 ## Code
 
-All code implementations utilized in this research will also be shared after the publication of the article.
+All code is shared in this repo. DMLP and other ML models are shared as separate codes. Do not use without permission without citing the source.
 
 ## Project Owners and Contributors
 
