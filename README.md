@@ -3,6 +3,11 @@
 **Authors:**  
 Fatih Aydın¹²*, Kürşat Mustafa Karaoğlan³, Hatice Yakut Pektürk⁴, Bilge Demir⁵, Volkan Karakurt⁶, Hayrettin Ahlatçı⁷
 
+**Abstract**
+This study evaluated the wear behavior of multiwall carbon nanotube (MWCNT) doped non-crimp fabric carbon fiber reinforced polymer (NCF-CFRP) composites produced through vac-uum infusion. Compared to 0 wt% MWCNT reinforced composite, the wear loss of 1 wt% MWCNT reinforced composite under loads of 10N and 30N decreased by 48.1% and 61.1%, respectively, for sliding distance of 1000 m.  Additionally, the study evaluated various Ma-chine Learning models including Deep Multi-Layer Perceptron (DMLP), Random Forest Re-gression, Gradient Boosting Regression, Linear Regression (LR), and Polynomial Regression for predicting wear loss. The DMLP model exhibited enhanced predictive capabilities in the testing phase (R²=0.9726) compared to its training performance (R²=0.9531), while the LR model maintained stable performance characteristics between training (R²=0.9712) and testing (R²=0.9454) phases.
+
+**Keywords:** Machine learning, Wear loss prediction, Quadriaxial non-crimp fabric, Carbon fiber, MWCNT, Wear behavior.
+
 ## Overview
 
 Predicting Wear Behavior of NCF-CFRP Composites using Machine Learning
