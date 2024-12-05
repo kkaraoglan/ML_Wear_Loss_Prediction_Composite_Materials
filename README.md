@@ -50,7 +50,7 @@ Soon
 ## Project Owners and Contributors
 
 ### Project Owners:
-  **Kürşat Mustafa Karaoğlan**  
+  - **Kürşat Mustafa Karaoğlan**  
   Department of Computer Engineering, Karabuk University, Karabuk, Turkey
   Email: [kkaraoglan@karabuk.edu.tr](mailto:fatih.aydin@karabuk.edu.tr)
   
@@ -61,8 +61,6 @@ Soon
  
 
 ### Contributors:
--
-
 - **Hatice Yakut Pektürk**  
   Department of Mechanical Engineering, Kırklareli University, Kırklareli, Turkey
 
