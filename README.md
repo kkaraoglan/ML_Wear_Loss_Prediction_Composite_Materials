@@ -43,8 +43,10 @@ Contributing
 Please open an issue first to discuss what you would like to change before making any contributions.
 Contact
 kkaraoglan@karabuk.edu.tr
-Citation
+
+## Citation
 If you use this work in your research, please cite:
+
 @article{AYDIN2025110451,
 title = {The comparative evaluation of the wear behavior of epoxy matrix hybrid nano-composites via experiments and machine learning models},
 journal = {Tribology International},
