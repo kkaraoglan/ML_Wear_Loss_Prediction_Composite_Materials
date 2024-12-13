@@ -45,7 +45,21 @@ Contact
 kkaraoglan@karabuk.edu.tr
 Citation
 If you use this work in your research, please cite:
-Soon
+@article{AYDIN2025110451,
+title = {The comparative evaluation of the wear behavior of epoxy matrix hybrid nano-composites via experiments and machine learning models},
+journal = {Tribology International},
+volume = {204},
+pages = {110451},
+year = {2025},
+issn = {0301-679X},
+doi = {https://doi.org/10.1016/j.triboint.2024.110451},
+url = {https://www.sciencedirect.com/science/article/pii/S0301679X24012039},
+author = {Fatih Aydın and Kürşat Mustafa Karaoğlan and Hatice Yakut Pektürk and Bilge Demir and Volkan Karakurt and Hayrettin Ahlatçı},
+keywords = {Machine learning, Wear loss prediction, Quadriaxial non-crimp fabric, Carbon fiber, MWCNT, Wear behavior},
+abstract = {This study evaluated the wear behavior of multiwall carbon nanotube (MWCNT) doped non-crimp fabric carbon fiber reinforced polymer (NCF-CFRP) composites produced through vacuum infusion. Compared to 0 wt% MWCNT reinforced composite, the wear loss of 1 wt% MWCNT reinforced composite under loads of 10 N and 30 N decreased by 48.1 % and 61.1 %, respectively, for sliding distance of 1000 m. Additionally, the study evaluated various Machine Learning models including Deep Multi-Layer Perceptron (DMLP), Random Forest Regression, Gradient Boosting Regression, Linear Regression (LR), and Polynomial Regression for predicting wear loss. The DMLP model exhibited enhanced predictive capabilities in the testing phase (R²=0.9726) compared to its training performance (R²=0.9531), while the LR model maintained stable performance characteristics between training (R²=0.9712) and testing (R²=0.9454) phases.}
+}
+
+Aydın, F., Karaoğlan, K. M., Pektürk, H. Y., Demir, B., Karakurt, V., & Ahlatçı, H. (2024). The comparative evaluation of the wear behavior of epoxy matrix hybrid nano-composites via experiments and machine learning models. Tribology International, 110451.
 
 ## Project Owners and Contributors
 
