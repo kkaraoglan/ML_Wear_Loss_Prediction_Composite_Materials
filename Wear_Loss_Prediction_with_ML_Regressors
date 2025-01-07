@@ -724,7 +724,7 @@ def main():
             },
             rf_params={
                 'n_estimators': 1000,
-                'max_depth': None, # Depth limit can be added according to your results. Important for overfitting 'max_depth': 4,
+                'max_depth': None, # Depth limit can be added according to your results. Important for avoid overfitting 'max_depth': 4,
                 'oob_score': True,
                 'warm_start': True,
                 'random_state': 42
@@ -732,7 +732,6 @@ def main():
                # 'min_samples_split': 5,
                # 'min_samples_leaf': 3,
                # 'max_features': 'sqrt',  # Limit the number of features
-               # 'oob_score': True
             }
         )
 
