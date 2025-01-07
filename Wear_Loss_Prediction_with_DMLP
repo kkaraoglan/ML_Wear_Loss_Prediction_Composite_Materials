@@ -281,8 +281,7 @@ def create_publication_quality_plots(best_model, target_column, metrics, early_s
                 edgecolor='none')
     plt.close()
 
-    def create_publication_quality_plots(best_model, target_column, metrics, early_stopping_epoch):
-        fig, ax = plt.subplots(figsize=(12, 10), dpi=300)
+    fig, ax = plt.subplots(figsize=(12, 10), dpi=300)
 
         ax.scatter(metrics['y_train_true'],
                    metrics['y_train_pred'],
