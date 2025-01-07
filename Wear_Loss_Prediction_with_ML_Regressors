@@ -718,7 +718,7 @@ def main():
             gb_params={
                 'n_estimators': 1000,
                 'learning_rate': 0.05,
-                'max_depth': 4,
+                'max_depth': 4,  # Depth limit can be added according to your results. Important for overfitting
                 'subsample': 0.8,
                 'random_state': 42
             },
