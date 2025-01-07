@@ -561,7 +561,7 @@ def process_dataset_with_gridsearch(file_name, target_column):
     except Exception as e:
         print(f"Error processing dataset {target_column}: {str(e)}")
         raise
-
+# Attention here: File name should be added directly to the source and the file name should be written. The output should be given a colon title. You can duplicate here. And adjust it according to yourself. For example, here in the Dataset_WearLoss_10N.xlsx excel, the last column was estimated as the dependent variable.
 if __name__ == "__main__":
     try:
         datasets = [
