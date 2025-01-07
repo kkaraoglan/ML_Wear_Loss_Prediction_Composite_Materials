@@ -718,16 +718,21 @@ def main():
             gb_params={
                 'n_estimators': 1000,
                 'learning_rate': 0.05,
-                'max_depth': 4,  # Depth limit can be added according to your results. Important for overfitting
+                'max_depth': 4,  
                 'subsample': 0.8,
                 'random_state': 42
             },
             rf_params={
                 'n_estimators': 1000,
-                'max_depth': None,
+                'max_depth': None, # Depth limit can be added according to your results. Important for overfitting 'max_depth': 4,
                 'oob_score': True,
                 'warm_start': True,
                 'random_state': 42
+ # The following parameters can be used to prevent overfitting.                
+               # 'min_samples_split': 5,
+               # 'min_samples_leaf': 3,
+               # 'max_features': 'sqrt',  # Limit the number of features
+               # 'oob_score': True
             }
         )
 
