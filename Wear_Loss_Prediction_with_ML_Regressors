@@ -729,12 +729,28 @@ def main():
                 'oob_score': True,
                 'warm_start': True,
                 'random_state': 42
- # The following parameters can be used to prevent overfitting.                
-               # 'min_samples_split': 5,
-               # 'min_samples_leaf': 3,
-               # 'max_features': 'sqrt',  # Limit the number of features
             }
+# The following parameters can be used to prevent overfitting.  You can also use the following parameters to prevent overfitting.
+
+#     rf_params={
+#         'n_estimators': 50,
+#         'max_depth': 3,
+#         'min_samples_split': 8,
+#         'min_samples_leaf': 4,
+#         'max_features': 'sqrt',
+#         'random_state': 42,
+#         'oob_score': True,
+#         'max_samples': 0.7,
+#         'ccp_alpha': 0.02,
+#         'min_impurity_decrease': 0.01,
+#         'bootstrap': True,
+#         'max_leaf_nodes': 8,
+#         'warm_start': False
+#     }
+
         )
+
+
 
         predictor = WearLossPredictor(config)
         logger.info("Running analysis with standard scaling")
